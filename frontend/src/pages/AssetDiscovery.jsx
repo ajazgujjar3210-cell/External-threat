@@ -15,12 +15,15 @@ const AssetDiscovery = () => {
   const [expandedScan, setExpandedScan] = useState(null)
   const [deleteConfirm, setDeleteConfirm] = useState(null)
   const [deleting, setDeleting] = useState(false)
+  const [stopConfirm, setStopConfirm] = useState(null)
+  const [stopping, setStopping] = useState(false)
   const [stats, setStats] = useState({
     total: 0,
     completed: 0,
     running: 0,
     pending: 0,
     failed: 0,
+    stopped: 0,
     totalAssets: 0,
   })
 
@@ -49,6 +52,7 @@ const AssetDiscovery = () => {
         running: discoveryScans.filter(s => s.status === 'running').length,
         pending: discoveryScans.filter(s => s.status === 'pending').length,
         failed: discoveryScans.filter(s => s.status === 'failed').length,
+        stopped: discoveryScans.filter(s => s.status === 'stopped').length,
         totalAssets: totalAssets,
       })
     } catch (error) {
@@ -102,12 +106,39 @@ const AssetDiscovery = () => {
     }
   }
 
+  const handleStopScan = async (scanId) => {
+    setStopping(true)
+    try {
+      // Ensure scanId is converted to string
+      const scanIdStr = String(scanId)
+      const url = `/api/scans/${scanIdStr}/stop/`
+      console.log('Stopping scan:', scanIdStr, 'URL:', url)
+      const response = await axios.post(url)
+      console.log('Stop scan response:', response)
+      setStopConfirm(null)
+      fetchScans()
+      alert('Scan stopped successfully!')
+    } catch (error) {
+      console.error('Stop scan error:', error)
+      console.error('Error response:', error.response)
+      console.error('Error URL:', error.config?.url)
+      const errorMsg = error.response?.data?.error || 
+                      error.response?.data?.message || 
+                      error.message || 
+                      'Failed to stop scan'
+      alert(errorMsg)
+    } finally {
+      setStopping(false)
+    }
+  }
+
   const getStatusColor = (status) => {
     const colors = {
       pending: 'bg-yellow-100 text-yellow-700 border-yellow-200',
       running: 'bg-blue-100 text-blue-700 border-blue-200',
       completed: 'bg-emerald-100 text-emerald-700 border-emerald-200',
       failed: 'bg-red-100 text-red-700 border-red-200',
+      stopped: 'bg-gray-100 text-gray-700 border-gray-200',
     }
     return colors[status] || colors.pending
   }
@@ -118,6 +149,7 @@ const AssetDiscovery = () => {
       running: 'fa-spinner fa-spin',
       completed: 'fa-check-circle',
       failed: 'fa-exclamation-circle',
+      stopped: 'fa-stop-circle',
     }
     return icons[status] || 'fa-question-circle'
   }
@@ -353,10 +385,21 @@ const AssetDiscovery = () => {
                                   <i className={`fas ${expandedScan === scan.id ? 'fa-chevron-up' : 'fa-chevron-down'} mr-1.5`}></i>
                                   {expandedScan === scan.id ? 'Hide' : 'View'} Assets
                                 </button>
-                              ) : (
-                                <span className="text-gray-400 text-sm">-</span>
+                              ) : null}
+                              {(scan.status === 'running' || scan.status === 'pending') && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    setStopConfirm(scan.id)
+                                  }}
+                                  className="px-3 py-1.5 text-xs font-medium text-orange-600 bg-orange-50 rounded-lg hover:bg-orange-100 transition-colors"
+                                  title="Stop Scan"
+                                >
+                                  <i className="fas fa-stop mr-1"></i>
+                                  Stop
+                                </button>
                               )}
-                              {scan.status !== 'running' && (
+                              {scan.status !== 'running' && scan.status !== 'pending' && (
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation()
@@ -713,6 +756,64 @@ const AssetDiscovery = () => {
                     <>
                       <i className="fas fa-trash mr-2"></i>
                       Delete Scan
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Stop Confirmation Modal */}
+        {stopConfirm && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center space-x-3">
+                  <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
+                    <i className="fas fa-stop-circle text-orange-600 text-xl"></i>
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900">Stop Scan</h2>
+                    <p className="text-sm text-gray-500">This will stop the running scan</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setStopConfirm(null)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <i className="fas fa-times text-xl"></i>
+                </button>
+              </div>
+
+              <div className="mb-6">
+                <p className="text-sm text-gray-700">
+                  Are you sure you want to stop this discovery scan? Any assets discovered so far will be saved, but the scan will not complete.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end space-x-3">
+                <button
+                  onClick={() => setStopConfirm(null)}
+                  disabled={stopping}
+                  className="px-6 py-2.5 text-sm font-medium text-gray-700 bg-white border-2 border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleStopScan(stopConfirm)}
+                  disabled={stopping}
+                  className="px-6 py-2.5 text-sm font-medium text-white bg-orange-600 rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {stopping ? (
+                    <>
+                      <i className="fas fa-spinner fa-spin mr-2"></i>
+                      Stopping...
+                    </>
+                  ) : (
+                    <>
+                      <i className="fas fa-stop mr-2"></i>
+                      Stop Scan
                     </>
                   )}
                 </button>

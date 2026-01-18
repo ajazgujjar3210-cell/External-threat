@@ -23,6 +23,7 @@ class ScanRun(models.Model):
         ('running', 'Running'),
         ('completed', 'Completed'),
         ('failed', 'Failed'),
+        ('stopped', 'Stopped'),
     ]
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
