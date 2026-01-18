@@ -71,7 +71,7 @@ class ScanRunDetailView(generics.RetrieveDestroyAPIView):
         # Prevent deletion of running scans
         if instance.status == 'running':
             return Response(
-                {'error': 'Cannot delete a scan that is currently running. Please wait for it to complete or fail.'},
+                {'error': 'Cannot delete a scan that is currently running. Please wait for it to complete or stop it first.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
@@ -80,6 +80,42 @@ class ScanRunDetailView(generics.RetrieveDestroyAPIView):
             {'message': 'Scan run deleted successfully'},
             status=status.HTTP_200_OK
         )
+
+
+@api_view(['POST'])
+@permission_classes([IsViewerOrAbove])
+def stop_scan(request, scan_id):
+    """Stop a running scan."""
+    user = request.user
+    
+    try:
+        if user.role == 'super_admin':
+            scan = ScanRun.objects.get(id=scan_id)
+        else:
+            scan = ScanRun.objects.get(id=scan_id, organization=user.organization)
+    except ScanRun.DoesNotExist:
+        return Response(
+            {'error': 'Scan not found'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    
+    # Only running or pending scans can be stopped
+    if scan.status not in ['running', 'pending']:
+        return Response(
+            {'error': f'Cannot stop a scan with status "{scan.status}". Only running or pending scans can be stopped.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Update scan status to stopped
+    scan.status = 'stopped'
+    scan.finished_at = timezone.now()
+    scan.error_message = 'Scan was manually stopped by user'
+    scan.save()
+    
+    return Response(
+        {'message': 'Scan stopped successfully', 'status': 'stopped'},
+        status=status.HTTP_200_OK
+    )
 
 
 class ScheduledDiscoveryListView(generics.ListCreateAPIView):
