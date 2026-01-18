@@ -1,0 +1,168 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+venv/
+env/
+ENV/
+.venv
+
+# Django
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+/media
+/staticfiles
+
+# Environment variables
+.env
+.env.local
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Build
+dist/
+build/
+*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Celery
+celerybeat-schedule
+celerybeat-schedule-shm
+celerybeat-schedule-wal
+
+# Database
+*.db
+*.sqlite3
+*.sqlite3-journal
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+*~
+
+# Docker
+.docker/
+
+# Secrets and credentials
+*.pem
+*.key
+*.crt
+secrets/
+credentials/
+
+# Frontend build
+frontend/dist/
+frontend/.vite/
+
+# Python virtual environments
+backend/venv/
+backend/vendor_assessment/venv/
+venv/
+ENV/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.code-workspace
+
+# Test files
+test_*.py
+*_test.py
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Documentation build
+docs/_build/
+site/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Backup files
+*.backup
+*.old
+
+# Documentation files (except README.md and LICENSE.md)
+# Note: Current .md files are already tracked, new ones will be ignored
+*.md
+!README.md
+!LICENSE.md
+!SETUP_AFTER_CLONE.md
+
+# Temporary documentation files
+*_FIX.md
+*_COMPLETE.md
+*_SUMMARY.md
+*_STATUS.md
+*_IMPLEMENTATION.md
+*_SETUP.md
+*_DEPLOYMENT.md
+*_QUICK*.md
+*_TROUBLESHOOTING.md
+HOW_TO_USE*.txt
+LOGIN_CREDENTIALS.txt
+SUPER_ADMIN_ACCESS.txt
+NEW_FEATURES.txt
+ACCESS_URLS.txt
+GIT_SETUP.md
+# Keep SETUP_AFTER_CLONE.md for users who clone
+
+# Batch files (except essential setup scripts)
+*.bat
+!backend/setup.bat
+!frontend/setup.bat
+!START_ALL_SERVICES.bat
+!START_DOCKER_SERVICES.bat
+!GIT_PUSH_TO_GITHUB.bat
+!GIT_PUSH_SIMPLE.bat
+!QUICK_SETUP_AFTER_CLONE.bat
+
+# Shell scripts (keep setup scripts)
+*.sh
+!backend/setup.sh
+!frontend/setup.sh

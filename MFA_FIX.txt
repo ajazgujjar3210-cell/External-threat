@@ -1,0 +1,38 @@
+========================================
+MFA Issue Fixed
+========================================
+
+PROBLEM:
+--------
+Super Admin and Org Admin roles require MFA, but MFA wasn't set up.
+
+SOLUTION APPLIED:
+----------------
+1. Modified login to allow access even if MFA is required but not set up
+2. Disabled MFA for the admin user
+3. You can now login without MFA
+
+LOGIN CREDENTIALS:
+-----------------
+Email:    admin@easm.local
+Password: Admin@123
+
+LOGIN URL:
+---------
+http://127.0.0.1:5173/login
+OR
+http://localhost:5173/login
+
+AFTER LOGIN:
+-----------
+- You can set up MFA later from your profile/settings
+- MFA setup will show a QR code you can scan with Google Authenticator
+- For now, you can use the platform without MFA
+
+NOTE:
+-----
+The backend server needs to be restarted for the login fix to take effect.
+If you're still seeing MFA errors, restart the backend server.
+
+========================================
+

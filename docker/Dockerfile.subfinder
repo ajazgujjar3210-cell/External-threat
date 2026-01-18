@@ -1,0 +1,29 @@
+# Subfinder Installation for Docker
+# Use this as reference for adding Subfinder to your main Dockerfile
+
+FROM python:3.11-slim
+
+# Install dependencies
+RUN apt-get update && apt-get install -y \
+    wget \
+    unzip \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Subfinder
+RUN wget https://github.com/projectdiscovery/subfinder/releases/latest/download/subfinder_linux_amd64.zip && \
+    unzip subfinder_linux_amd64.zip && \
+    mv subfinder /usr/local/bin/ && \
+    chmod +x /usr/local/bin/subfinder && \
+    rm subfinder_linux_amd64.zip && \
+    subfinder -version
+
+# Verify installation
+RUN subfinder -version
+
+# Rest of your Dockerfile continues here...
+# COPY requirements.txt .
+# RUN pip install -r requirements.txt
+# etc.
+
+
