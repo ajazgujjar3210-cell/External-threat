@@ -1,0 +1,111 @@
+========================================
+   TERMINAL PAR PUSH KARNE KE COMMANDS
+========================================
+
+Repository: https://github.com/ajazgujjar3210-cell/External-threat.git
+
+========================================
+STEP 1: Check Current Status
+========================================
+git status
+
+Yeh dikhayega ki kya changes hain jo commit karne hain.
+
+========================================
+STEP 2: Add All Changes
+========================================
+git add .
+
+Yeh saari changed files ko staging area mein add karega.
+
+Agar sirf specific files add karni hain:
+git add filename1 filename2
+
+========================================
+STEP 3: Commit Changes
+========================================
+git commit -m "Your commit message here"
+
+Example:
+git commit -m "Update assets page"
+git commit -m "Add new features"
+git commit -m "Fix bugs"
+
+========================================
+STEP 4: Push to GitHub
+========================================
+git push -u origin main
+
+Pehli baar push karne ke liye:
+git push -u origin main
+
+Baad mein sirf:
+git push
+
+========================================
+COMPLETE EXAMPLE (Ek Saath)
+========================================
+
+# 1. Status check
+git status
+
+# 2. Add all changes
+git add .
+
+# 3. Commit
+git commit -m "Update project files"
+
+# 4. Push
+git push -u origin main
+
+========================================
+AGAR PUSH FAIL HO JAYE
+========================================
+
+1. Authentication Issue:
+   - GitHub username/password enter karein
+   - Ya Personal Access Token use karein
+   - Ya GitHub CLI: gh auth login
+
+2. Check Remote:
+   git remote -v
+   
+   Agar remote nahi hai:
+   git remote add origin https://github.com/ajazgujjar3210-cell/External-threat.git
+
+3. Check Branch:
+   git branch
+   
+   Agar main branch nahi hai:
+   git branch -M main
+
+========================================
+QUICK PUSH (Ek Line Mein)
+========================================
+
+git add . && git commit -m "Update" && git push
+
+========================================
+USEFUL COMMANDS
+========================================
+
+# Check what will be committed
+git status
+
+# See commit history
+git log --oneline
+
+# Check remote repository
+git remote -v
+
+# Pull latest changes (agar kisi aur ne push kiya ho)
+git pull origin main
+
+# Discard changes (agar galat changes hain)
+git checkout -- filename
+
+# Unstage files
+git reset HEAD filename
+
+========================================
+
