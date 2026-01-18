@@ -161,6 +161,7 @@ GIT_SETUP.md
 !GIT_PUSH_TO_GITHUB.bat
 !GIT_PUSH_SIMPLE.bat
 !QUICK_SETUP_AFTER_CLONE.bat
+!PUSH_TO_GITHUB.bat
 
 # Shell scripts (keep setup scripts)
 *.sh
