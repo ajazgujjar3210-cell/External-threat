@@ -34,7 +34,8 @@ def generate_iso27001_report(organization, format_type='csv'):
         for asset in assets:
             try:
                 metadata = asset.metadata
-                criticality = metadata.criticality
+                # Get criticality from metadata JSONField
+                criticality = metadata.metadata.get('criticality', 'Not Set') if metadata.metadata else 'Not Set'
             except:
                 criticality = 'Not Set'
             writer.writerow([

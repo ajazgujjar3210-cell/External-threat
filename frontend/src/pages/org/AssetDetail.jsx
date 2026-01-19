@@ -11,7 +11,7 @@ const AssetDetail = () => {
   const [vulnerabilities, setVulnerabilities] = useState([])
   const [loading, setLoading] = useState(true)
   const [ownership, setOwnership] = useState({ department: '', owner_name: '', owner_email: '' })
-  const [metadata, setMetadata] = useState({ criticality: 'low', business_function: '', tags: [] })
+  const [metadata, setMetadata] = useState({ criticality: 'low', business_function: '', tags: [] }) // metadata is now a JSONField object
   const [saving, setSaving] = useState(false)
   const isViewer = user?.role === 'viewer'
 
@@ -33,7 +33,13 @@ const AssetDetail = () => {
         setOwnership(assetRes.data.ownership)
       }
       if (assetRes.data.metadata) {
-        setMetadata(assetRes.data.metadata)
+        // metadata is now a JSONField, so use it directly or provide defaults
+        const meta = assetRes.data.metadata || {}
+        setMetadata({
+          criticality: meta.criticality || 'low',
+          business_function: meta.business_function || '',
+          tags: meta.tags || []
+        })
       }
     } catch (error) {
       console.error('Error fetching asset:', error)
@@ -57,7 +63,8 @@ const AssetDetail = () => {
   const handleSaveMetadata = async () => {
     setSaving(true)
     try {
-      await axios.put(`/api/assets/${asset_id}/metadata/`, metadata)
+      // Send metadata as JSONField structure
+      await axios.put(`/api/assets/${asset_id}/metadata/`, { metadata: metadata })
       alert('Metadata updated successfully')
       fetchAssetData()
     } catch (error) {

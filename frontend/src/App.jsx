@@ -32,6 +32,7 @@ import AppVulnerabilities from './pages/app/AppVulnerabilities'
 import AppRisks from './pages/app/AppRisks'
 import AppReports from './pages/app/AppReports'
 import ProtectedRoute from './components/ProtectedRoute'
+import InviteAccept from './pages/InviteAccept'
 
 function App() {
   return (
@@ -41,6 +42,7 @@ function App() {
         <Routes>
           {/* Common Routes */}
           <Route path="/login" element={<Login />} />
+          <Route path="/invite/:token" element={<InviteAccept />} />
           <Route path="/mfa/verify" element={<MFAVerify />} />
           <Route
             path="/mfa/setup"

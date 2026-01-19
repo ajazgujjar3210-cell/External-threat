@@ -42,7 +42,7 @@ class AssetSerializer(serializers.ModelSerializer):
     
     def validate_asset_type(self, value):
         """Validate asset type."""
-        valid_types = ['domain', 'subdomain', 'ip', 'api']
+        valid_types = ['domain', 'subdomain', 'ip', 'api', 'web_service', 'web_application', 'port', 'service']
         if value not in valid_types:
             raise serializers.ValidationError(f'Asset type must be one of: {", ".join(valid_types)}')
         return value
@@ -62,12 +62,9 @@ class AssetSerializer(serializers.ModelSerializer):
     def get_metadata(self, obj):
         """Get metadata."""
         try:
-            metadata = obj.metadata
-            return {
-                'criticality': metadata.criticality,
-                'business_function': metadata.business_function,
-                'tags': metadata.tags,
-            }
+            metadata_obj = obj.metadata
+            # Return the metadata JSONField directly, or provide defaults
+            return metadata_obj.metadata if metadata_obj.metadata else {}
         except AssetMetadata.DoesNotExist:
             return None
 
@@ -103,7 +100,6 @@ class AssetMetadataSerializer(serializers.ModelSerializer):
     class Meta:
         model = AssetMetadata
         fields = [
-            'id', 'asset', 'asset_name', 'criticality', 'business_function',
-            'tags', 'notes', 'created_at', 'updated_at'
+            'id', 'asset', 'asset_name', 'metadata', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
