@@ -121,6 +121,7 @@ class Ownership(models.Model):
     department = models.CharField(max_length=255, blank=True)
     owner_name = models.CharField(max_length=255, blank=True)
     owner_email = models.EmailField(blank=True)
+    notes = models.TextField(blank=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
@@ -134,19 +135,9 @@ class Ownership(models.Model):
 class AssetMetadata(models.Model):
     """Asset metadata model."""
     
-    CRITICALITY_CHOICES = [
-        ('low', 'Low'),
-        ('medium', 'Medium'),
-        ('high', 'High'),
-        ('critical', 'Critical'),
-    ]
-    
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     asset = models.OneToOneField(Asset, on_delete=models.CASCADE, related_name='metadata')
-    criticality = models.CharField(max_length=20, choices=CRITICALITY_CHOICES, default='low')
-    business_function = models.CharField(max_length=255, blank=True)
-    tags = models.JSONField(default=list, blank=True)
-    notes = models.TextField(blank=True)
+    metadata = models.JSONField(default=dict, help_text='Additional asset metadata')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     

@@ -9,7 +9,7 @@ import pyotp
 import qrcode
 import io
 import base64
-from .models import User, Organization, MFARecoveryCode
+from .models import User, Organization, MFARecoveryCode, OrganizationInvitation
 
 
 class OrganizationSerializer(serializers.ModelSerializer):
@@ -17,7 +17,10 @@ class OrganizationSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Organization
-        fields = ['id', 'name', 'status', 'created_at', 'updated_at', 'mfa_required']
+        fields = [
+            'id', 'name', 'status', 'created_at', 'updated_at', 'mfa_required',
+            'admin_email', 'admin_first_name', 'admin_last_name'
+        ]
         read_only_fields = ['id', 'created_at', 'updated_at']
 
 
@@ -155,4 +158,50 @@ class TokenSerializer(serializers.Serializer):
     access = serializers.CharField()
     refresh = serializers.CharField()
     user = UserSerializer()
+
+
+class OrganizationInvitationAcceptSerializer(serializers.Serializer):
+    """Serializer for accepting organization invitation."""
+    
+    token = serializers.CharField(required=True)
+    password = serializers.CharField(
+        write_only=True,
+        required=True,
+        min_length=8,
+        help_text='Password must be at least 8 characters'
+    )
+    password_confirm = serializers.CharField(write_only=True, required=True)
+    mfa_code = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        help_text='MFA code if MFA setup is required'
+    )
+    
+    def validate(self, attrs):
+        """Validate invitation acceptance."""
+        token = attrs.get('token')
+        password = attrs.get('password')
+        password_confirm = attrs.get('password_confirm')
+        
+        # Check passwords match
+        if password != password_confirm:
+            raise serializers.ValidationError({'password_confirm': 'Passwords do not match.'})
+        
+        # Validate password
+        try:
+            validate_password(password)
+        except Exception as e:
+            raise serializers.ValidationError({'password': list(e.messages)})
+        
+        # Check invitation
+        try:
+            invitation = OrganizationInvitation.objects.get(token=token)
+        except OrganizationInvitation.DoesNotExist:
+            raise serializers.ValidationError({'token': 'Invalid invitation token.'})
+        
+        if not invitation.is_valid():
+            raise serializers.ValidationError({'token': 'Invitation has expired or already been used.'})
+        
+        attrs['invitation'] = invitation
+        return attrs
 

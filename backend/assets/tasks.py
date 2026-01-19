@@ -26,14 +26,18 @@ def calculate_asset_aging():
         # Get or create metadata
         metadata, created = AssetMetadata.objects.get_or_create(asset=asset)
         
-        # Store age in metadata tags
-        if not metadata.tags:
-            metadata.tags = []
+        # Initialize metadata dict if needed
+        if not metadata.metadata:
+            metadata.metadata = {}
+        if 'tags' not in metadata.metadata:
+            metadata.metadata['tags'] = []
         
         # Update age tag
         age_tag = f"age_days:{age_days}"
-        metadata.tags = [tag for tag in metadata.tags if not tag.startswith('age_days:')]
-        metadata.tags.append(age_tag)
+        tags = metadata.metadata.get('tags', [])
+        tags = [tag for tag in tags if not tag.startswith('age_days:')]
+        tags.append(age_tag)
+        metadata.metadata['tags'] = tags
         metadata.save()
         
         updated_count += 1

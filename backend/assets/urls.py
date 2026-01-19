@@ -15,5 +15,6 @@ urlpatterns = [
     path('categories/<uuid:pk>/', views.AssetCategoryDetailView.as_view(), name='asset-category-detail'),
     path('<uuid:pk>/ownership/', views.OwnershipView.as_view(), name='asset-ownership'),
     path('<uuid:pk>/metadata/', views.AssetMetadataView.as_view(), name='asset-metadata'),
+    path('dashboard/stats/', views.dashboard_stats, name='dashboard-stats'),
 ]
 

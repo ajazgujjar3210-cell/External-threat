@@ -26,6 +26,24 @@ class Organization(models.Model):
         default=False,
         help_text='Enforce MFA for all users in this org'
     )
+    # Admin details for invitation
+    admin_email = models.EmailField(
+        blank=True,
+        null=True,
+        help_text='Email address of the organization admin to invite'
+    )
+    admin_first_name = models.CharField(
+        max_length=150,
+        blank=True,
+        null=True,
+        help_text='First name of the organization admin'
+    )
+    admin_last_name = models.CharField(
+        max_length=150,
+        blank=True,
+        null=True,
+        help_text='Last name of the organization admin'
+    )
     
     class Meta:
         db_table = 'organizations'
@@ -126,4 +144,41 @@ class MFARecoveryCode(models.Model):
         self.used = True
         self.used_at = timezone.now()
         self.save()
+
+
+class OrganizationInvitation(models.Model):
+    """Organization invitation tokens for admin signup."""
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        related_name='invitations'
+    )
+    email = models.EmailField()
+    token = models.CharField(max_length=255, unique=True)
+    used = models.BooleanField(default=False)
+    expires_at = models.DateTimeField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    used_at = models.DateTimeField(null=True, blank=True)
+    
+    class Meta:
+        db_table = 'organization_invitations'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['token']),
+            models.Index(fields=['email', 'used']),
+        ]
+    
+    def __str__(self):
+        return f"Invitation for {self.email} to {self.organization.name}"
+    
+    def is_valid(self):
+        """Check if invitation is still valid."""
+        return not self.used and timezone.now() < self.expires_at
+    
+    @staticmethod
+    def generate_token():
+        """Generate a secure invitation token."""
+        return secrets.token_urlsafe(32)
 

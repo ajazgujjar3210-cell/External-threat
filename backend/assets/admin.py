@@ -28,7 +28,15 @@ class OwnershipAdmin(admin.ModelAdmin):
 
 @admin.register(AssetMetadata)
 class AssetMetadataAdmin(admin.ModelAdmin):
-    list_display = ['asset', 'criticality', 'business_function']
-    list_filter = ['criticality']
-    search_fields = ['asset__name', 'business_function']
+    list_display = ['asset', 'get_criticality', 'created_at', 'updated_at']
+    list_filter = ['created_at', 'updated_at']
+    search_fields = ['asset__name']
+    readonly_fields = ['id', 'created_at', 'updated_at']
+    
+    def get_criticality(self, obj):
+        """Get criticality from metadata JSONField."""
+        if obj.metadata and 'criticality' in obj.metadata:
+            return obj.metadata['criticality']
+        return 'Not Set'
+    get_criticality.short_description = 'Criticality'
 

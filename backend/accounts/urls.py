@@ -18,6 +18,9 @@ urlpatterns = [
     path('orgs/', views.OrganizationListCreateView.as_view(), name='org-list-create'),
     path('orgs/<uuid:pk>/', views.OrganizationDetailView.as_view(), name='org-detail'),
     
+    # Invitation
+    path('invite/accept/', views.accept_invitation, name='accept-invitation'),
+    
     # Users (Org Admin only)
     path('users/', views.UserListCreateView.as_view(), name='user-list-create'),
     path('users/<uuid:pk>/', views.UserDetailView.as_view(), name='user-detail'),

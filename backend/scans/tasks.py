@@ -743,6 +743,9 @@ def auto_assign_ownership(asset, asset_data):
     """
     Automatically assign ownership to discovered assets based on patterns.
     """
+    import logging
+    logger = logging.getLogger(__name__)
+    
     try:
         # Check if ownership already exists
         try:
@@ -792,10 +795,10 @@ def auto_assign_ownership(asset, asset_data):
             ownership.owner_name = 'Unassigned'
             ownership.owner_email = f'security@{asset.organization.name.lower().replace(" ", "")}.com'
         
+        # Ensure notes field is set (even if empty)
+        ownership.notes = ownership.notes or ''
         ownership.save()
         
-        import logging
-        logger = logging.getLogger(__name__)
         logger.info(f"Auto-assigned ownership for {asset.name}: {ownership.department} - {ownership.owner_name}")
         
     except Exception as e:

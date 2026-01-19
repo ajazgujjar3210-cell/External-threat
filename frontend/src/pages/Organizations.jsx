@@ -10,6 +10,9 @@ const Organizations = () => {
     name: '',
     status: 'active',
     mfa_required: false,
+    admin_email: '',
+    admin_first_name: '',
+    admin_last_name: '',
   })
 
   useEffect(() => {
@@ -31,13 +34,26 @@ const Organizations = () => {
   const handleCreate = async (e) => {
     e.preventDefault()
     try {
-      await axios.post('/api/auth/orgs/', formData)
+      const response = await axios.post('/api/auth/orgs/', formData)
       setShowModal(false)
-      setFormData({ name: '', status: 'active', mfa_required: false })
+      setFormData({ 
+        name: '', 
+        status: 'active', 
+        mfa_required: false,
+        admin_email: '',
+        admin_first_name: '',
+        admin_last_name: '',
+      })
       fetchOrganizations()
+      if (formData.admin_email) {
+        alert(`Organization created successfully! Invitation email sent to ${formData.admin_email}`)
+      } else {
+        alert('Organization created successfully!')
+      }
     } catch (error) {
       console.error('Error creating organization:', error)
-      alert('Failed to create organization')
+      const errorMsg = error.response?.data?.error || error.response?.data?.message || 'Failed to create organization'
+      alert(errorMsg)
     }
   }
 
@@ -153,6 +169,57 @@ const Organizations = () => {
                     className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
                   />
                   <label className="ml-2 text-sm text-gray-700">Require MFA for all users</label>
+                </div>
+
+                <div className="border-t border-gray-200 pt-4 mt-4">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Organization Admin Details</h3>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Enter admin details to send an invitation email. The admin will be able to set up their account and MFA.
+                  </p>
+                  
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        First Name
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.admin_first_name}
+                        onChange={(e) => setFormData({ ...formData, admin_first_name: e.target.value })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                        placeholder="Admin first name"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Last Name
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.admin_last_name}
+                        onChange={(e) => setFormData({ ...formData, admin_last_name: e.target.value })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                        placeholder="Admin last name"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Admin Email *
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={formData.admin_email}
+                      onChange={(e) => setFormData({ ...formData, admin_email: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                      placeholder="admin@example.com"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      An invitation email will be sent to this address
+                    </p>
+                  </div>
                 </div>
 
                 <div className="flex items-center justify-end space-x-4 pt-4">

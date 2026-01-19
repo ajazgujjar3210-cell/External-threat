@@ -27,10 +27,21 @@ const Assets = () => {
     owner_email: ''
   })
   const [savingOwnership, setSavingOwnership] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pagination, setPagination] = useState({
+    count: 0,
+    next: null,
+    previous: null,
+    total_pages: 1
+  })
+
+  useEffect(() => {
+    setCurrentPage(1) // Reset to first page when filters change
+  }, [filters])
 
   useEffect(() => {
     fetchAssets()
-  }, [filters])
+  }, [filters, currentPage])
 
   useEffect(() => {
     filterAssets()
@@ -38,28 +49,89 @@ const Assets = () => {
 
   const fetchAssets = async () => {
     try {
-      const params = {}
+      setLoading(true)
+      const params = {
+        page: currentPage,
+        page_size: 5  // 5 assets per page
+      }
       if (filters.asset_type) params.asset_type = filters.asset_type
       if (filters.is_active !== '') params.is_active = filters.is_active === 'true'
       if (filters.is_unknown !== '') params.is_unknown = filters.is_unknown === 'true'
 
       const response = await axios.get('/api/assets/', { params })
-      const data = response.data.results || response.data || []
-      setAssets(data)
-      setFilteredAssets(data)
       
-      // Calculate statistics
-      setStats({
-        total: data.length,
-        active: data.filter(a => a.is_active).length,
-        inactive: data.filter(a => !a.is_active).length,
-        unknown: data.filter(a => a.is_unknown).length,
-      })
+      // Handle paginated response
+      if (response.data.results) {
+        const data = response.data.results
+        setAssets(data)
+        setFilteredAssets(data)
+        setPagination({
+          count: response.data.count || 0,
+          next: response.data.next,
+          previous: response.data.previous,
+          total_pages: Math.ceil((response.data.count || 0) / 5)
+        })
+        
+        // Calculate statistics from all assets (need to fetch separately or use count)
+        setStats({
+          total: response.data.count || data.length,
+          active: data.filter(a => a.is_active).length,
+          inactive: data.filter(a => !a.is_active).length,
+          unknown: data.filter(a => a.is_unknown).length,
+        })
+      } else {
+        // Non-paginated response (fallback)
+        const data = response.data || []
+        setAssets(data)
+        setFilteredAssets(data)
+        setStats({
+          total: data.length,
+          active: data.filter(a => a.is_active).length,
+          inactive: data.filter(a => !a.is_active).length,
+          unknown: data.filter(a => a.is_unknown).length,
+        })
+      }
     } catch (error) {
       console.error('Error fetching assets:', error)
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleSaveOwnership = async () => {
+    if (!selectedAsset) return
+    
+    setSavingOwnership(true)
+    try {
+      await axios.put(`/api/assets/${selectedAsset.id}/ownership/`, ownershipForm)
+      alert('Ownership updated successfully!')
+      setShowOwnershipModal(false)
+      // Reset form
+      setOwnershipForm({ department: '', owner_name: '', owner_email: '' })
+      setSelectedAsset(null)
+      // Refresh assets
+      fetchAssets()
+    } catch (error) {
+      console.error('Error saving ownership:', error)
+      alert('Failed to update ownership. Please try again.')
+    } finally {
+      setSavingOwnership(false)
+    }
+  }
+
+  const handleEditOwnership = (asset) => {
+    setSelectedAsset(asset)
+    // Pre-fill form with existing ownership if available
+    if (asset.ownership) {
+      setOwnershipForm({
+        department: asset.ownership.department || '',
+        owner_name: asset.ownership.owner_name || '',
+        owner_email: asset.ownership.owner_email || ''
+      })
+    } else {
+      setOwnershipForm({ department: '', owner_name: '', owner_email: '' })
+    }
+    setShowOwnershipModal(true)
   }
 
   const filterAssets = () => {
@@ -260,6 +332,7 @@ const Assets = () => {
                     onClick={() => {
                       setFilters({ asset_type: '', is_active: '', is_unknown: '' })
                       setSearchQuery('')
+                      setCurrentPage(1) // Reset to first page when clearing filters
                     }}
                     className="w-full px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition-colors flex items-center justify-center"
                   >
@@ -422,13 +495,7 @@ const Assets = () => {
                             <button
                               onClick={(e) => {
                                 e.stopPropagation()
-                                setSelectedAsset(asset)
-                                setOwnershipForm({
-                                  department: asset.ownership?.department || '',
-                                  owner_name: asset.ownership?.owner_name || '',
-                                  owner_email: asset.ownership?.owner_email || ''
-                                })
-                                setShowOwnershipModal(true)
+                                handleEditOwnership(asset)
                               }}
                               className="px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
                               title="Edit Ownership"
@@ -465,6 +532,63 @@ const Assets = () => {
                   </tbody>
                 </table>
               </div>
+              
+              {/* Pagination Controls */}
+              {pagination.total_pages > 1 && (
+                <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm text-gray-600">
+                      Showing page <span className="font-semibold">{currentPage}</span> of{' '}
+                      <span className="font-semibold">{pagination.total_pages}</span> ({pagination.count} total assets)
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                        disabled={!pagination.previous || currentPage === 1}
+                        className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        <i className="fas fa-chevron-left mr-1"></i>
+                        Previous
+                      </button>
+                      <div className="flex items-center space-x-1">
+                        {Array.from({ length: Math.min(5, pagination.total_pages) }, (_, i) => {
+                          let pageNum
+                          if (pagination.total_pages <= 5) {
+                            pageNum = i + 1
+                          } else if (currentPage <= 3) {
+                            pageNum = i + 1
+                          } else if (currentPage >= pagination.total_pages - 2) {
+                            pageNum = pagination.total_pages - 4 + i
+                          } else {
+                            pageNum = currentPage - 2 + i
+                          }
+                          return (
+                            <button
+                              key={pageNum}
+                              onClick={() => setCurrentPage(pageNum)}
+                              className={`px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                                currentPage === pageNum
+                                  ? 'bg-blue-600 text-white'
+                                  : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
+                              }`}
+                            >
+                              {pageNum}
+                            </button>
+                          )
+                        })}
+                      </div>
+                      <button
+                        onClick={() => setCurrentPage(prev => Math.min(pagination.total_pages, prev + 1))}
+                        disabled={!pagination.next || currentPage === pagination.total_pages}
+                        className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        Next
+                        <i className="fas fa-chevron-right ml-1"></i>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </>
           ) : (
             <div className="p-12 text-center">

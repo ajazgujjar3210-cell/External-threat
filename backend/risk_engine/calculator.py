@@ -59,9 +59,11 @@ def calculate_risk_score(vulnerability):
             'high': 1.5,
             'critical': 2.0
         }
-        criticality_factor = criticality_map.get(metadata.criticality, 1.0)
+        # Get criticality from metadata JSONField
+        criticality = metadata.metadata.get('criticality', 'low') if metadata.metadata else 'low'
+        criticality_factor = criticality_map.get(criticality, 1.0)
         explanation['asset_criticality'] = criticality_factor
-        explanation['factors']['asset_criticality'] = metadata.criticality
+        explanation['factors']['asset_criticality'] = criticality
     except AssetMetadata.DoesNotExist:
         explanation['factors']['asset_criticality'] = 'not_set'
     
