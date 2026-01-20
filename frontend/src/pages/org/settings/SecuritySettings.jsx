@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import Layout from '../../../components/Layout'
+// Layout is now handled by ProtectedRoute
 import axios from 'axios'
 import { useAuth } from '../../../contexts/AuthContext'
 
@@ -50,19 +50,19 @@ const SecuritySettings = () => {
 
   if (loading) {
     return (
-      <Layout>
+      <>
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
             <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-primary-500 border-t-transparent"></div>
             <p className="mt-4 text-gray-600">Loading settings...</p>
           </div>
         </div>
-      </Layout>
+      </>
     )
   }
 
   return (
-    <Layout>
+    <>
       <div className="space-y-8">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Security Settings</h1>
@@ -137,7 +137,7 @@ const SecuritySettings = () => {
           </form>
         </div>
       </div>
-    </Layout>
+    </>
   )
 }
 

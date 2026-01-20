@@ -1,10 +1,24 @@
 import { useState, useEffect } from 'react'
-import Layout from '../components/Layout'
+// Layout is now handled by ProtectedRoute
 import axios from 'axios'
+import { useAuth } from '../contexts/AuthContext'
 
 const Users = () => {
+  const { user } = useAuth()
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [createForm, setCreateForm] = useState({
+    email: '',
+    username: '',
+    password: '',
+    role: 'user',
+    first_name: '',
+    last_name: ''
+  })
+  const [creating, setCreating] = useState(false)
+  const [error, setError] = useState('')
+  const [message, setMessage] = useState('')
 
   useEffect(() => {
     fetchUsers()
@@ -46,15 +60,60 @@ const Users = () => {
     })
   }, [users])
 
+  const handleCreateUser = async (e) => {
+    e.preventDefault()
+    setCreating(true)
+    setError('')
+    setMessage('')
+
+    try {
+      const response = await axios.post('/api/auth/users/', createForm)
+      setMessage('User created successfully!')
+      setCreateForm({
+        email: '',
+        username: '',
+        password: '',
+        role: 'user',
+        first_name: '',
+        last_name: ''
+      })
+      fetchUsers()
+      setTimeout(() => {
+        setShowCreateModal(false)
+        setMessage('')
+      }, 2000)
+    } catch (error) {
+      const errorMsg = error.response?.data?.role?.[0] || 
+                      error.response?.data?.error || 
+                      error.response?.data?.message || 
+                      'Failed to create user'
+      setError(errorMsg)
+    } finally {
+      setCreating(false)
+    }
+  }
+
   return (
-    <Layout>
+    <>
       <div className="space-y-6 md:space-y-8 fade-in">
         {/* Header Section - Enterprise Grade */}
-        <div className="space-y-2">
-          <h1 className="text-4xl md:text-5xl font-extrabold bg-gradient-to-r from-[#00C8FF] via-[#0066FF] to-[#7C3AED] bg-clip-text text-transparent tracking-tight">
-            Users
-          </h1>
-          <p className="text-gray-600 text-base md:text-lg font-medium">Manage organization users</p>
+        <div className="flex items-start justify-between">
+          <div className="space-y-2">
+            <h1 className="text-4xl md:text-5xl font-extrabold bg-gradient-to-r from-[#00C8FF] via-[#0066FF] to-[#7C3AED] bg-clip-text text-transparent tracking-tight">
+              Users
+            </h1>
+            <p className="text-gray-600 text-base md:text-lg font-medium">Manage organization users</p>
+          </div>
+          {/* Create User Button - Only for Super Admin and Org Admin */}
+          {(user?.role === 'super_admin' || user?.role === 'org_admin') && (
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="px-6 py-3 bg-gradient-to-r from-[#00C8FF] to-[#0066FF] text-white font-semibold rounded-lg shadow-lg hover:from-[#00B8E6] hover:to-[#0055E6] transition-all duration-200 flex items-center gap-2"
+            >
+              <i className="fas fa-plus"></i>
+              Create User
+            </button>
+          )}
         </div>
 
         {/* Statistics Cards - Enterprise Glassmorphism */}
@@ -204,7 +263,220 @@ const Users = () => {
           )}
         </div>
       </div>
-    </Layout>
+
+      {/* Create User Modal */}
+      {showCreateModal && (
+        <>
+          <div 
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50"
+            onClick={() => {
+              setShowCreateModal(false)
+              setCreateForm({
+                email: '',
+                username: '',
+                password: '',
+                role: 'user',
+                first_name: '',
+                last_name: ''
+              })
+              setError('')
+              setMessage('')
+            }}
+          />
+          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl z-50 p-4">
+            <div className="bg-white rounded-xl shadow-2xl p-6 animate-scale-in max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#00C8FF] to-[#0066FF] flex items-center justify-center">
+                    <i className="fa-solid fa-user-plus text-white text-lg"></i>
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-900">Create New User</h2>
+                    <p className="text-sm text-gray-500">
+                      {user?.role === 'org_admin' 
+                        ? 'Create a user or viewer for your organization'
+                        : 'Create a new user account'}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowCreateModal(false)
+                    setCreateForm({
+                      email: '',
+                      username: '',
+                      password: '',
+                      role: 'user',
+                      first_name: '',
+                      last_name: ''
+                    })
+                    setError('')
+                    setMessage('')
+                  }}
+                  className="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+                >
+                  <i className="fa-solid fa-xmark"></i>
+                </button>
+              </div>
+
+              <form onSubmit={handleCreateUser} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Email Address *
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={createForm.email}
+                      onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#00C8FF] focus:border-transparent"
+                      placeholder="user@example.com"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Username *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={createForm.username}
+                      onChange={(e) => setCreateForm({ ...createForm, username: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#00C8FF] focus:border-transparent"
+                      placeholder="username"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Password *
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    value={createForm.password}
+                    onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#00C8FF] focus:border-transparent"
+                    placeholder="Enter password"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      First Name
+                    </label>
+                    <input
+                      type="text"
+                      value={createForm.first_name}
+                      onChange={(e) => setCreateForm({ ...createForm, first_name: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#00C8FF] focus:border-transparent"
+                      placeholder="First name"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Last Name
+                    </label>
+                    <input
+                      type="text"
+                      value={createForm.last_name}
+                      onChange={(e) => setCreateForm({ ...createForm, last_name: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#00C8FF] focus:border-transparent"
+                      placeholder="Last name"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Role *
+                  </label>
+                  <select
+                    required
+                    value={createForm.role}
+                    onChange={(e) => setCreateForm({ ...createForm, role: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#00C8FF] focus:border-transparent"
+                    disabled={user?.role === 'org_admin'} // Org Admin can only create user/viewer
+                  >
+                    {user?.role === 'super_admin' ? (
+                      <>
+                        <option value="super_admin">Super Admin</option>
+                        <option value="org_admin">Organization Admin</option>
+                        <option value="user">User</option>
+                        <option value="viewer">Viewer</option>
+                        <option value="security_analyst">Security Analyst</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="user">User</option>
+                        <option value="viewer">Viewer</option>
+                      </>
+                    )}
+                  </select>
+                  {user?.role === 'org_admin' && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Organization Admin can only create "User" or "Viewer" roles
+                    </p>
+                  )}
+                </div>
+
+                {error && (
+                  <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                    {error}
+                  </div>
+                )}
+
+                {message && (
+                  <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm">
+                    {message}
+                  </div>
+                )}
+
+                <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowCreateModal(false)
+                      setCreateForm({
+                        email: '',
+                        username: '',
+                        password: '',
+                        role: 'user',
+                        first_name: '',
+                        last_name: ''
+                      })
+                      setError('')
+                      setMessage('')
+                    }}
+                    className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                    disabled={creating}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={creating}
+                    className="px-6 py-2 bg-gradient-to-r from-[#00C8FF] to-[#0066FF] text-white font-semibold rounded-lg hover:from-[#00B8E6] hover:to-[#0055E6] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {creating ? (
+                      <>
+                        <i className="fa-solid fa-spinner animate-spin mr-2"></i>
+                        Creating...
+                      </>
+                    ) : (
+                      'Create User'
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </>
+      )}
+    </>
   )
 }
 

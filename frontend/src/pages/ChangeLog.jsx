@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-import Layout from '../components/Layout'
 import axios from 'axios'
 
 const ChangeLog = () => {
@@ -61,7 +60,6 @@ const ChangeLog = () => {
   }, [changes])
 
   return (
-    <Layout>
       <div className="space-y-6 md:space-y-8 fade-in">
         {/* Header Section - Enterprise Grade */}
         <div className="space-y-2">
@@ -213,7 +211,6 @@ const ChangeLog = () => {
           )}
         </div>
       </div>
-    </Layout>
   )
 }
 

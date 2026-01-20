@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import Layout from '../../components/Layout'
+// Layout is now handled by ProtectedRoute
 import { useAuth } from '../../contexts/AuthContext'
 import axios from 'axios'
 
@@ -15,6 +15,10 @@ const Profile = () => {
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
+  const [showMfaDisableModal, setShowMfaDisableModal] = useState(false)
+  const [mfaCode, setMfaCode] = useState('')
+  const [usePassword, setUsePassword] = useState(false)
+  const [password, setPassword] = useState('')
 
   useEffect(() => {
     if (user) {
@@ -48,23 +52,50 @@ const Profile = () => {
 
   const handleMfaToggle = async () => {
     if (mfaStatus) {
-      // Disable MFA
-      try {
-        await axios.post('/api/auth/mfa/disable/')
-        setMfaStatus(false)
-        setMessage('MFA disabled successfully')
-        await fetchUser()
-      } catch (error) {
-        setError(error.response?.data?.error || 'Failed to disable MFA')
-      }
+      // Show modal to enter MFA code
+      setShowMfaDisableModal(true)
+      setError('')
+      setMessage('')
     } else {
       // Redirect to MFA setup
       window.location.href = '/mfa/setup'
     }
   }
 
+  const handleMfaDisable = async () => {
+    if (!usePassword && (!mfaCode || mfaCode.length !== 6)) {
+      setError('Please enter a valid 6-digit MFA code')
+      return
+    }
+
+    if (usePassword && !password) {
+      setError('Please enter your password')
+      return
+    }
+
+    setLoading(true)
+    setError('')
+    setMessage('')
+
+    try {
+      const payload = usePassword ? { password } : { code: mfaCode }
+      await axios.post('/api/auth/mfa/disable/', payload)
+      setMfaStatus(false)
+      setMessage('MFA disabled successfully')
+      setShowMfaDisableModal(false)
+      setMfaCode('')
+      setPassword('')
+      setUsePassword(false)
+      await fetchUser()
+    } catch (error) {
+      setError(error.response?.data?.code?.[0] || error.response?.data?.error || 'Failed to disable MFA. Please check your credentials.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
-    <Layout>
+    <>
       <div className="space-y-8">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Profile Settings</h1>
@@ -253,7 +284,162 @@ const Profile = () => {
           </div>
         )}
       </div>
-    </Layout>
+
+      {/* MFA Disable Modal */}
+      {showMfaDisableModal && (
+        <>
+          <div 
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50"
+            onClick={() => {
+              setShowMfaDisableModal(false)
+              setMfaCode('')
+              setError('')
+            }}
+          />
+          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md z-50 p-4">
+            <div className="bg-white rounded-xl shadow-2xl p-6 animate-scale-in">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-red-100 flex items-center justify-center">
+                    <i className="fa-solid fa-shield-halved text-red-600 text-lg"></i>
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-900">Disable MFA</h2>
+                    <p className="text-sm text-gray-500">Enter your MFA code to confirm</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowMfaDisableModal(false)
+                    setMfaCode('')
+                    setPassword('')
+                    setUsePassword(false)
+                    setError('')
+                  }}
+                  className="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+                >
+                  <i className="fa-solid fa-xmark"></i>
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {/* Toggle between MFA code and password */}
+                <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                  <button
+                    onClick={() => {
+                      setUsePassword(false)
+                      setError('')
+                      setMfaCode('')
+                    }}
+                    className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors ${
+                      !usePassword
+                        ? 'bg-red-600 text-white'
+                        : 'bg-white text-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    MFA Code
+                  </button>
+                  <button
+                    onClick={() => {
+                      setUsePassword(true)
+                      setError('')
+                      setPassword('')
+                    }}
+                    className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors ${
+                      usePassword
+                        ? 'bg-red-600 text-white'
+                        : 'bg-white text-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    Password
+                  </button>
+                </div>
+
+                {!usePassword ? (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      MFA Code
+                    </label>
+                    <input
+                      type="text"
+                      value={mfaCode}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/\D/g, '').slice(0, 6)
+                        setMfaCode(value)
+                        setError('')
+                      }}
+                      placeholder="000000"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent text-center text-2xl tracking-widest font-mono"
+                      maxLength={6}
+                      autoFocus
+                    />
+                    <p className="text-xs text-gray-500 mt-2">
+                      Enter the 6-digit code from your authenticator app
+                    </p>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Your Password
+                    </label>
+                    <input
+                      type="password"
+                      value={password}
+                      onChange={(e) => {
+                        setPassword(e.target.value)
+                        setError('')
+                      }}
+                      placeholder="Enter your password"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                      autoFocus
+                    />
+                    <p className="text-xs text-gray-500 mt-2">
+                      Enter your account password to disable MFA
+                    </p>
+                  </div>
+                )}
+
+                {error && (
+                  <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                    {error}
+                  </div>
+                )}
+
+                <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200">
+                  <button
+                    onClick={() => {
+                      setShowMfaDisableModal(false)
+                      setMfaCode('')
+                      setPassword('')
+                      setUsePassword(false)
+                      setError('')
+                    }}
+                    className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                    disabled={loading}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleMfaDisable}
+                    disabled={loading || (!usePassword && mfaCode.length !== 6) || (usePassword && !password)}
+                    className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {loading ? (
+                      <>
+                        <i className="fa-solid fa-spinner animate-spin mr-2"></i>
+                        Disabling...
+                      </>
+                    ) : (
+                      'Disable MFA'
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+    </>
   )
 }
 

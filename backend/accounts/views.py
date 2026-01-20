@@ -5,6 +5,7 @@ from rest_framework import status, generics, permissions
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework import serializers as drf_serializers
 from django.contrib.auth import authenticate
 from django.utils import timezone
 from .models import User, Organization, MFARecoveryCode, OrganizationInvitation
@@ -113,18 +114,46 @@ def mfa_setup(request):
 @api_view(['POST'])
 @permission_classes([permissions.IsAuthenticated])
 def mfa_disable(request):
-    """Disable MFA endpoint."""
-    serializer = MFAVerifySerializer(data=request.data, context={'user': request.user})
-    if not serializer.is_valid():
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    """Disable MFA endpoint.
+    
+    Accepts either:
+    - MFA code (code field)
+    - Password verification (password field) as fallback
+    """
+    user = request.user
+    code = request.data.get('code')
+    password = request.data.get('password')
+    
+    # Validate that at least one verification method is provided
+    if not code and not password:
+        return Response(
+            {'error': 'Either MFA code or password is required to disable MFA.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Verify MFA code if provided
+    if code:
+        serializer = MFAVerifySerializer(data={'code': code}, context={'user': user})
+        if not serializer.is_valid():
+            # If MFA code fails, allow password verification as fallback
+            if not password:
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Verify password if provided (as fallback or primary method)
+    if password:
+        if not user.check_password(password):
+            return Response(
+                {'error': 'Invalid password.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
     
     # Disable MFA
-    request.user.mfa_enabled = False
-    request.user.mfa_secret = None
-    request.user.save()
+    user.mfa_enabled = False
+    user.mfa_secret = None
+    user.save()
     
     # Delete recovery codes
-    MFARecoveryCode.objects.filter(user=request.user).delete()
+    MFARecoveryCode.objects.filter(user=user).delete()
     
     return Response({'message': 'MFA disabled successfully.'})
 
@@ -244,29 +273,155 @@ class OrganizationDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsSuperAdmin]
 
 
-# User Management (Org Admin only)
+# User Management
 class UserListCreateView(generics.ListCreateAPIView):
-    """List and create users (Org Admin only)."""
+    """
+    List and create users with role-based restrictions:
+    - Super Admin: Can create Organization Admins and view all users
+    - Organization Admin: Can create only 'user' and 'viewer' roles in their organization
+    - Regular Users: Cannot create users
+    """
     serializer_class = UserSerializer
-    permission_classes = [IsOrgAdmin]
+    permission_classes = [IsOrgAdmin]  # Only Org Admin and Super Admin can access
     
     def get_queryset(self):
-        """Get users in the same organization."""
+        """Get users based on role."""
+        user = self.request.user
+        if user.role == 'super_admin':
+            # Super admin can see all users
+            return User.objects.all()
+        # Organization Admin can only see users in their organization
         return User.objects.filter(organization=self.request.user.organization)
     
     def perform_create(self, serializer):
-        """Create user in the same organization."""
-        serializer.save(organization=self.request.user.organization)
+        """Create user with role-based restrictions."""
+        current_user = self.request.user
+        requested_role = serializer.validated_data.get('role')
+        
+        # Super Admin can create Organization Admins
+        if current_user.role == 'super_admin':
+            # Super admin can create any role, including org_admin
+            organization = serializer.validated_data.get('organization')
+            if not organization and requested_role != 'super_admin':
+                # If no org specified and not creating super_admin, raise error
+                raise drf_serializers.ValidationError({
+                    'organization': 'Organization is required for this role.'
+                })
+            serializer.save()
+            return
+        
+        # Organization Admin restrictions
+        if current_user.role == 'org_admin':
+            # Org Admin can ONLY create 'user' and 'viewer' roles
+            if requested_role not in ['user', 'viewer']:
+                raise drf_serializers.ValidationError({
+                    'role': f'Organization Admin can only create "user" or "viewer" roles. Cannot create "{requested_role}".'
+                })
+            
+            # Org Admin cannot create users in other organizations
+            serializer.save(organization=current_user.organization)
+            return
+        
+        # Regular users cannot create other users
+        raise drf_serializers.ValidationError({
+            'error': 'You do not have permission to create users.'
+        })
 
 
 class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
-    """User detail view (Org Admin only)."""
+    """
+    User detail view with role-based restrictions:
+    - Super Admin: Can update/delete any user, change all settings including login settings
+    - Organization Admin: Can update users in their org but CANNOT change login settings (password, MFA, etc.)
+    - Regular Users: Cannot modify other users
+    """
     serializer_class = UserSerializer
     permission_classes = [IsOrgAdmin]
     
     def get_queryset(self):
-        """Get users in the same organization."""
+        """Get users based on role."""
+        user = self.request.user
+        if user.role == 'super_admin':
+            # Super admin can see all users
+            return User.objects.all()
+        # Organization Admin can only see users in their organization
         return User.objects.filter(organization=self.request.user.organization)
+    
+    def update(self, request, *args, **kwargs):
+        """Update user with role-based restrictions."""
+        current_user = request.user
+        target_user = self.get_object()
+        
+        # Super Admin can change anything
+        if current_user.role == 'super_admin':
+            return super().update(request, *args, **kwargs)
+        
+        # Organization Admin restrictions
+        if current_user.role == 'org_admin':
+            # Org Admin cannot change login-related settings
+            restricted_fields = ['password', 'mfa_enabled', 'mfa_secret', 'is_active', 'is_staff', 'is_superuser']
+            
+            # Check if trying to change restricted fields
+            for field in restricted_fields:
+                if field in request.data:
+                    return Response(
+                        {'error': f'Organization Admin cannot change "{field}". Only Super Admin can modify login settings.'},
+                        status=status.HTTP_403_FORBIDDEN
+                    )
+            
+            # Org Admin cannot change user role to org_admin or super_admin
+            if 'role' in request.data:
+                new_role = request.data['role']
+                if new_role in ['org_admin', 'super_admin']:
+                    return Response(
+                        {'error': 'Organization Admin cannot change user role to "org_admin" or "super_admin".'},
+                        status=status.HTTP_403_FORBIDDEN
+                    )
+            
+            # Org Admin can only update users in their organization
+            if target_user.organization != current_user.organization:
+                return Response(
+                    {'error': 'You can only update users in your organization.'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            return super().update(request, *args, **kwargs)
+        
+        # Regular users cannot modify other users
+        return Response(
+            {'error': 'You do not have permission to modify users.'},
+            status=status.HTTP_403_FORBIDDEN
+        )
+    
+    def destroy(self, request, *args, **kwargs):
+        """Delete user with role-based restrictions."""
+        current_user = request.user
+        target_user = self.get_object()
+        
+        # Super Admin can delete anyone
+        if current_user.role == 'super_admin':
+            return super().destroy(request, *args, **kwargs)
+        
+        # Organization Admin can only delete users in their organization
+        if current_user.role == 'org_admin':
+            if target_user.organization != current_user.organization:
+                return Response(
+                    {'error': 'You can only delete users in your organization.'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            # Org Admin cannot delete other org admins
+            if target_user.role == 'org_admin':
+                return Response(
+                    {'error': 'Organization Admin cannot delete other Organization Admins.'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            return super().destroy(request, *args, **kwargs)
+        
+        # Regular users cannot delete anyone
+        return Response(
+            {'error': 'You do not have permission to delete users.'},
+            status=status.HTTP_403_FORBIDDEN
+        )
 
 
 @api_view(['GET', 'POST'])

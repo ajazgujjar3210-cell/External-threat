@@ -17,14 +17,18 @@ class RateLimitMiddleware(MiddlewareMixin):
         if not request.path.startswith('/api/'):
             return None
         
-        # Skip rate limiting for admin endpoints
+        # Skip rate limiting for login endpoint - authentication provides protection
+        # Login attempts are already protected by Django's authentication system
         if request.path.startswith('/api/auth/login'):
-            # More lenient for login
-            limit = 10  # 10 requests
-            window = 60  # per minute
-        else:
-            limit = 100  # 100 requests
-            window = 60  # per minute
+            return None  # Skip rate limiting for login
+        
+        # Skip rate limiting for refresh token endpoint
+        if request.path.startswith('/api/auth/refresh'):
+            return None
+        
+        # Apply rate limiting to other API endpoints
+        limit = 100  # 100 requests
+        window = 60  # per minute
         
         # Get client IP
         ip = self.get_client_ip(request)

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import Layout from '../components/Layout'
+// Layout is now handled by ProtectedRoute
 import axios from 'axios'
 
 const Risks = () => {
@@ -58,7 +58,7 @@ const Risks = () => {
   }, [risks])
 
   return (
-    <Layout>
+    <>
       <div className="space-y-6 md:space-y-8 fade-in">
         {/* Header Section - Enterprise Grade */}
         <div className="space-y-2">
@@ -204,7 +204,7 @@ const Risks = () => {
           )}
         </div>
       </div>
-    </Layout>
+    </>
   )
 }
 

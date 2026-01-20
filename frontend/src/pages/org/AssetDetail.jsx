@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import Layout from '../../components/Layout'
+// Layout is now handled by ProtectedRoute
 import axios from 'axios'
 import { useAuth } from '../../contexts/AuthContext'
 
@@ -76,32 +76,32 @@ const AssetDetail = () => {
 
   if (loading) {
     return (
-      <Layout>
+      <>
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
             <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-primary-500 border-t-transparent"></div>
             <p className="mt-4 text-gray-600">Loading asset...</p>
           </div>
         </div>
-      </Layout>
+      </>
     )
   }
 
   if (!asset) {
     return (
-      <Layout>
+      <>
         <div className="text-center py-12">
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Asset not found</h2>
           <Link to="/org/assets/inventory" className="text-[#00C8FF] hover:underline">
             Back to Assets
           </Link>
         </div>
-      </Layout>
+      </>
     )
   }
 
   return (
-    <Layout>
+    <>
       <div className="space-y-8">
         <div className="flex items-center justify-between">
           <div>
@@ -300,7 +300,7 @@ const AssetDetail = () => {
           </div>
         </div>
       </div>
-    </Layout>
+    </>
   )
 }
 

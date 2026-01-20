@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-import Layout from '../components/Layout'
 import axios from 'axios'
 import { Link } from 'react-router-dom'
 
@@ -36,7 +35,7 @@ const Assets = () => {
   })
 
   useEffect(() => {
-    setCurrentPage(1) // Reset to first page when filters change
+    setCurrentPage(1)
   }, [filters])
 
   useEffect(() => {
@@ -52,7 +51,7 @@ const Assets = () => {
       setLoading(true)
       const params = {
         page: currentPage,
-        page_size: 5  // 5 assets per page
+        page_size: 10
       }
       if (filters.asset_type) params.asset_type = filters.asset_type
       if (filters.is_active !== '') params.is_active = filters.is_active === 'true'
@@ -60,7 +59,6 @@ const Assets = () => {
 
       const response = await axios.get('/api/assets/', { params })
       
-      // Handle paginated response
       if (response.data.results) {
         const data = response.data.results
         setAssets(data)
@@ -69,10 +67,9 @@ const Assets = () => {
           count: response.data.count || 0,
           next: response.data.next,
           previous: response.data.previous,
-          total_pages: Math.ceil((response.data.count || 0) / 5)
+          total_pages: Math.ceil((response.data.count || 0) / 10)
         })
         
-        // Calculate statistics from all assets (need to fetch separately or use count)
         setStats({
           total: response.data.count || data.length,
           active: data.filter(a => a.is_active).length,
@@ -80,7 +77,6 @@ const Assets = () => {
           unknown: data.filter(a => a.is_unknown).length,
         })
       } else {
-        // Non-paginated response (fallback)
         const data = response.data || []
         setAssets(data)
         setFilteredAssets(data)
@@ -104,16 +100,12 @@ const Assets = () => {
     setSavingOwnership(true)
     try {
       await axios.put(`/api/assets/${selectedAsset.id}/ownership/`, ownershipForm)
-      alert('Ownership updated successfully!')
       setShowOwnershipModal(false)
-      // Reset form
       setOwnershipForm({ department: '', owner_name: '', owner_email: '' })
       setSelectedAsset(null)
-      // Refresh assets
       fetchAssets()
     } catch (error) {
       console.error('Error saving ownership:', error)
-      alert('Failed to update ownership. Please try again.')
     } finally {
       setSavingOwnership(false)
     }
@@ -121,7 +113,6 @@ const Assets = () => {
 
   const handleEditOwnership = (asset) => {
     setSelectedAsset(asset)
-    // Pre-fill form with existing ownership if available
     if (asset.ownership) {
       setOwnershipForm({
         department: asset.ownership.department || '',
@@ -165,548 +156,486 @@ const Assets = () => {
 
   const getAssetTypeColor = (type) => {
     const colors = {
-      domain: 'bg-blue-100 text-blue-700 border-blue-200',
-      subdomain: 'bg-purple-100 text-purple-700 border-purple-200',
-      ip: 'bg-green-100 text-green-700 border-green-200',
-      api: 'bg-amber-100 text-amber-700 border-amber-200',
-      web_service: 'bg-cyan-100 text-cyan-700 border-cyan-200',
-      web_application: 'bg-indigo-100 text-indigo-700 border-indigo-200',
-      port: 'bg-orange-100 text-orange-700 border-orange-200',
-      service: 'bg-pink-100 text-pink-700 border-pink-200',
+      domain: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400',
+      subdomain: 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400',
+      ip: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400',
+      api: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400',
+      web_service: 'bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-400',
+      web_application: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400',
+      port: 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400',
+      service: 'bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-400',
     }
-    return colors[type] || 'bg-gray-100 text-gray-700 border-gray-200'
+    return colors[type] || 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-400'
   }
 
+  const StatCard = ({ title, value, icon, gradient, delay = 0 }) => (
+    <div 
+      className="stat-card group animate-fade-in-up"
+      style={{ animationDelay: `${delay}ms` }}
+    >
+      <div className="flex items-start justify-between">
+        <div className="flex-1">
+          <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">{title}</p>
+          <p className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight">
+            {loading ? (
+              <span className="inline-block w-12 h-8 bg-slate-200 dark:bg-slate-700 rounded animate-pulse"></span>
+            ) : (
+              value?.toLocaleString()
+            )}
+          </p>
+        </div>
+        <div className={`w-12 h-12 rounded-xl ${gradient} flex items-center justify-center shadow-lg transition-transform group-hover:scale-110`}>
+          <i className={`fa-solid ${icon} text-white text-lg`}></i>
+        </div>
+      </div>
+    </div>
+  )
+
   return (
-    <Layout>
-      <div className="space-y-6">
-        {/* Header Section */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Assets</h1>
-            <p className="text-gray-600 mt-1">Manage and monitor your external assets</p>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <Link
-              to="/org/asset-discovery"
-              className="px-5 py-2.5 bg-gradient-to-r from-[#00C8FF] to-[#0066FF] text-white font-semibold rounded-lg shadow-md hover:from-[#00B8E6] hover:to-[#0055E6] transition-all duration-200 flex items-center text-sm"
-            >
-              <i className="fas fa-search mr-2"></i>
-              Asset Discovery
-            </Link>
-            <Link
-              to="/org/security-scans"
-              className="px-5 py-2.5 bg-gradient-to-r from-red-500 to-rose-500 text-white font-semibold rounded-lg shadow-md hover:from-red-600 hover:to-rose-600 transition-all duration-200 flex items-center text-sm"
-            >
-              <i className="fas fa-shield-alt mr-2"></i>
-              Security Scans
-            </Link>
-          </div>
+    <div className="space-y-6">
+      {/* Page Header */}
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 animate-fade-in">
+        <div>
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight">
+            Asset Inventory
+          </h1>
+          <p className="text-slate-500 dark:text-slate-400 mt-1">
+            Manage and monitor your external attack surface
+          </p>
         </div>
-
-        {/* Statistics Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg p-6 text-white">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-blue-100 text-sm font-medium mb-1">Total Assets</p>
-                <p className="text-3xl font-bold">{stats.total}</p>
-              </div>
-              <div className="w-12 h-12 bg-white bg-opacity-20 rounded-lg flex items-center justify-center">
-                <i className="fas fa-network-wired text-2xl"></i>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl shadow-lg p-6 text-white">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-emerald-100 text-sm font-medium mb-1">Active</p>
-                <p className="text-3xl font-bold">{stats.active}</p>
-              </div>
-              <div className="w-12 h-12 bg-white bg-opacity-20 rounded-lg flex items-center justify-center">
-                <i className="fas fa-check-circle text-2xl"></i>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-gradient-to-br from-red-500 to-red-600 rounded-xl shadow-lg p-6 text-white">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-red-100 text-sm font-medium mb-1">Inactive</p>
-                <p className="text-3xl font-bold">{stats.inactive}</p>
-              </div>
-              <div className="w-12 h-12 bg-white bg-opacity-20 rounded-lg flex items-center justify-center">
-                <i className="fas fa-times-circle text-2xl"></i>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl shadow-lg p-6 text-white">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-amber-100 text-sm font-medium mb-1">Unknown</p>
-                <p className="text-3xl font-bold">{stats.unknown}</p>
-              </div>
-              <div className="w-12 h-12 bg-white bg-opacity-20 rounded-lg flex items-center justify-center">
-                <i className="fas fa-question-circle text-2xl"></i>
-              </div>
-            </div>
-          </div>
+        <div className="flex flex-wrap gap-3">
+          <Link to="/org/asset-discovery" className="btn btn-primary">
+            <i className="fa-solid fa-satellite-dish"></i>
+            <span>Asset Discovery</span>
+          </Link>
+          <Link to="/org/security-scans" className="btn btn-secondary">
+            <i className="fa-solid fa-shield"></i>
+            <span>Security Scans</span>
+          </Link>
         </div>
+      </div>
 
-        {/* Search and Filters */}
-        <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
-          <div className="space-y-4">
-            {/* Search Bar */}
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <i className="fas fa-search text-gray-400"></i>
-              </div>
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search assets by name, type, or source..."
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-              {searchQuery && (
+      {/* Statistics Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard
+          title="Total Assets"
+          value={stats.total}
+          icon="fa-server"
+          gradient="bg-gradient-to-br from-primary-500 to-primary-600"
+          delay={0}
+        />
+        <StatCard
+          title="Active"
+          value={stats.active}
+          icon="fa-circle-check"
+          gradient="bg-gradient-to-br from-green-500 to-emerald-600"
+          delay={50}
+        />
+        <StatCard
+          title="Inactive"
+          value={stats.inactive}
+          icon="fa-circle-xmark"
+          gradient="bg-gradient-to-br from-red-500 to-rose-600"
+          delay={100}
+        />
+        <StatCard
+          title="Unknown"
+          value={stats.unknown}
+          icon="fa-circle-question"
+          gradient="bg-gradient-to-br from-amber-500 to-orange-600"
+          delay={150}
+        />
+      </div>
+
+      {/* Search and Filters */}
+      <div className="card p-6 animate-fade-in-up" style={{ animationDelay: '200ms' }}>
+        <div className="space-y-4">
+          {/* Search Bar */}
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+              <i className="fa-solid fa-magnifying-glass text-slate-400"></i>
+            </div>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search assets by name, type, or source..."
+              className="input pl-11"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+              >
+                <i className="fa-solid fa-xmark"></i>
+              </button>
+            )}
+          </div>
+
+          {/* Filters */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                Asset Type
+              </label>
+              <select
+                value={filters.asset_type}
+                onChange={(e) => setFilters({ ...filters, asset_type: e.target.value })}
+                className="input"
+              >
+                <option value="">All Types</option>
+                <option value="domain">Domain</option>
+                <option value="subdomain">Subdomain</option>
+                <option value="ip">IP Address</option>
+                <option value="port">Port</option>
+                <option value="service">Service</option>
+                <option value="web_service">Web Service</option>
+                <option value="web_application">Web Application</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                Status
+              </label>
+              <select
+                value={filters.is_active}
+                onChange={(e) => setFilters({ ...filters, is_active: e.target.value })}
+                className="input"
+              >
+                <option value="">All Status</option>
+                <option value="true">Active</option>
+                <option value="false">Inactive</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                Classification
+              </label>
+              <select
+                value={filters.is_unknown}
+                onChange={(e) => setFilters({ ...filters, is_unknown: e.target.value })}
+                className="input"
+              >
+                <option value="">All Assets</option>
+                <option value="true">Unknown Only</option>
+                <option value="false">Known Only</option>
+              </select>
+            </div>
+            <div className="flex items-end">
+              {(filters.asset_type || filters.is_active || filters.is_unknown || searchQuery) && (
                 <button
-                  onClick={() => setSearchQuery('')}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                  onClick={() => {
+                    setFilters({ asset_type: '', is_active: '', is_unknown: '' })
+                    setSearchQuery('')
+                    setCurrentPage(1)
+                  }}
+                  className="btn btn-ghost w-full"
                 >
-                  <i className="fas fa-times text-gray-400 hover:text-gray-600"></i>
+                  <i className="fa-solid fa-rotate-left"></i>
+                  <span>Clear Filters</span>
                 </button>
               )}
             </div>
-
-            {/* Filters */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-2 border-t border-gray-200">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  <i className="fas fa-filter mr-2 text-gray-500"></i>Asset Type
-                </label>
-                <select
-                  value={filters.asset_type}
-                  onChange={(e) => setFilters({ ...filters, asset_type: e.target.value })}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
-                >
-                  <option value="">All Types</option>
-                  <option value="domain">Domain</option>
-                  <option value="subdomain">Subdomain</option>
-                  <option value="ip">IP Address</option>
-                  <option value="api">API Endpoint</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  <i className="fas fa-toggle-on mr-2 text-gray-500"></i>Status
-                </label>
-                <select
-                  value={filters.is_active}
-                  onChange={(e) => setFilters({ ...filters, is_active: e.target.value })}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
-                >
-                  <option value="">All Status</option>
-                  <option value="true">Active</option>
-                  <option value="false">Inactive</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  <i className="fas fa-question-circle mr-2 text-amber-600"></i>Unknown Assets
-                </label>
-                <select
-                  value={filters.is_unknown}
-                  onChange={(e) => setFilters({ ...filters, is_unknown: e.target.value })}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
-                >
-                  <option value="">All Assets</option>
-                  <option value="true">Unknown Only</option>
-                  <option value="false">Known Only</option>
-                </select>
-              </div>
-              <div className="flex items-end">
-                {(filters.asset_type || filters.is_active || filters.is_unknown || searchQuery) && (
-                  <button
-                    onClick={() => {
-                      setFilters({ asset_type: '', is_active: '', is_unknown: '' })
-                      setSearchQuery('')
-                      setCurrentPage(1) // Reset to first page when clearing filters
-                    }}
-                    className="w-full px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition-colors flex items-center justify-center"
-                  >
-                    <i className="fas fa-redo mr-2"></i>
-                    Clear Filters
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Results Count */}
-            {searchQuery && (
-              <div className="text-sm text-gray-600 pt-2 border-t border-gray-200">
-                Showing <span className="font-semibold text-gray-900">{filteredAssets.length}</span> of{' '}
-                <span className="font-semibold text-gray-900">{assets.length}</span> assets
-              </div>
-            )}
           </div>
         </div>
+      </div>
 
-        {/* Assets Table */}
-        <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
-          {loading ? (
-            <div className="p-12 text-center">
-              <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent"></div>
-              <p className="mt-4 text-gray-600">Loading assets...</p>
+      {/* Assets Table */}
+      <div className="card overflow-hidden animate-fade-in-up" style={{ animationDelay: '250ms' }}>
+        {loading ? (
+          <div className="p-12 text-center">
+            <div className="inline-block">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center animate-pulse">
+                <i className="fa-solid fa-server text-white text-xl"></i>
+              </div>
             </div>
-          ) : filteredAssets.length > 0 ? (
-            <>
-              <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-gray-900">
-                    Assets ({filteredAssets.length})
-                  </h3>
-                  <button className="text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center">
-                    <i className="fas fa-download mr-2"></i>
-                    Export
-                  </button>
-                </div>
+            <p className="mt-4 text-slate-500 dark:text-slate-400">Loading assets...</p>
+          </div>
+        ) : filteredAssets.length > 0 ? (
+          <>
+            <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between bg-slate-50 dark:bg-slate-800/50">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
+                  Assets
+                </h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  {pagination.count} total assets
+                </p>
               </div>
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                        Asset
-                      </th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                        Type
-                      </th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                        Status
-                      </th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                        Discovery Source
-                      </th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                        First Seen
-                      </th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                        Last Seen
-                      </th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                        Ownership
-                      </th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {filteredAssets.map((asset) => (
-                      <tr key={asset.id} className="hover:bg-blue-50 transition-colors cursor-pointer">
-                        <td className="px-6 py-4">
-                          <div className="flex items-center space-x-3">
-                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                              asset.asset_type === 'domain' ? 'bg-blue-100 text-blue-600' :
-                              asset.asset_type === 'subdomain' ? 'bg-purple-100 text-purple-600' :
-                              asset.asset_type === 'ip' ? 'bg-green-100 text-green-600' :
-                              'bg-amber-100 text-amber-600'
-                            }`}>
-                              <i className={`fas ${getAssetIcon(asset.asset_type)}`}></i>
-                            </div>
-                            <div>
-                              <div className="text-sm font-semibold text-gray-900">{asset.name}</div>
-                              {asset.is_unknown && (
-                                <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-gradient-to-r from-amber-400 to-orange-500 text-white mt-1 shadow-sm border border-amber-500">
-                                  <i className="fas fa-exclamation-triangle mr-1.5"></i>
-                                  UNKNOWN ASSET
-                                </span>
-                              )}
-                            </div>
+              <button className="btn btn-ghost">
+                <i className="fa-solid fa-download"></i>
+                <span>Export</span>
+              </button>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-slate-50 dark:bg-slate-800/50">
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                      Asset
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                      Type
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                      Source
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                      First Seen
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+                  {filteredAssets.map((asset, index) => (
+                    <tr 
+                      key={asset.id} 
+                      className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                      style={{ animationDelay: `${300 + index * 30}ms` }}
+                    >
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${getAssetTypeColor(asset.asset_type)}`}>
+                            <i className={`fa-solid ${getAssetIcon(asset.asset_type)}`}></i>
                           </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className={`inline-flex items-center px-3 py-1 rounded-lg text-xs font-semibold border ${getAssetTypeColor(asset.asset_type)}`}>
-                            <i className={`fas ${getAssetIcon(asset.asset_type)} mr-2`}></i>
-                            {asset.asset_type}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span
-                            className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
-                              asset.is_active
-                                ? 'bg-emerald-100 text-emerald-700'
-                                : 'bg-red-100 text-red-700'
-                            }`}
-                          >
-                            <i className={`fas ${asset.is_active ? 'fa-check-circle' : 'fa-times-circle'} mr-1.5`}></i>
-                            {asset.is_active ? 'Active' : 'Inactive'}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className="text-sm text-gray-600">
-                            {asset.discovery_source ? (
-                              <span className="inline-flex items-center">
-                                <i className="fas fa-search mr-1.5 text-gray-400"></i>
-                                {asset.discovery_source}
-                              </span>
-                            ) : (
-                              <span className="text-gray-400">Manual</span>
-                            )}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-600">
-                          {asset.first_seen ? (
-                            <div>
-                              <div>{new Date(asset.first_seen).toLocaleDateString()}</div>
-                              <div className="text-xs text-gray-400">{new Date(asset.first_seen).toLocaleTimeString()}</div>
-                            </div>
-                          ) : (
-                            '-'
-                          )}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-600">
-                          {asset.last_seen ? (
-                            <div>
-                              <div>{new Date(asset.last_seen).toLocaleDateString()}</div>
-                              <div className="text-xs text-gray-400">{new Date(asset.last_seen).toLocaleTimeString()}</div>
-                            </div>
-                          ) : (
-                            '-'
-                          )}
-                        </td>
-                        <td className="px-6 py-4">
-                          {asset.ownership ? (
-                            <div className="space-y-1">
-                              <div className="text-sm font-medium text-gray-900">{asset.ownership.owner_name || 'Unassigned'}</div>
-                              <div className="text-xs text-gray-500">{asset.ownership.department || '-'}</div>
-                              {asset.ownership.owner_email && (
-                                <div className="text-xs text-blue-600">{asset.ownership.owner_email}</div>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-xs text-gray-400 italic">Not assigned</span>
-                          )}
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center space-x-2">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                handleEditOwnership(asset)
-                              }}
-                              className="px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
-                              title="Edit Ownership"
-                            >
-                              <i className="fas fa-user-edit mr-1"></i>
-                              Edit
-                            </button>
+                          <div>
+                            <p className="text-sm font-medium text-slate-900 dark:text-white">
+                              {asset.name}
+                            </p>
                             {asset.is_unknown && (
-                              <button
-                                onClick={async (e) => {
-                                  e.stopPropagation()
-                                  if (window.confirm(`Mark "${asset.name}" as known/managed?`)) {
-                                    try {
-                                      await axios.post(`/api/assets/${asset.id}/mark-known/`)
-                                      await fetchAssets()
-                                      alert('Asset marked as known!')
-                                    } catch (error) {
-                                      console.error('Error marking asset as known:', error)
-                                      alert('Failed to mark asset as known')
-                                    }
-                                  }
-                                }}
-                                className="px-3 py-1.5 text-xs font-medium text-emerald-600 bg-emerald-50 rounded-lg hover:bg-emerald-100 transition-colors"
-                                title="Mark as Known"
-                              >
-                                <i className="fas fa-check-circle mr-1"></i>
-                                Mark Known
-                              </button>
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 mt-1">
+                                <i className="fa-solid fa-triangle-exclamation text-[10px]"></i>
+                                Unknown
+                              </span>
                             )}
                           </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              
-              {/* Pagination Controls */}
-              {pagination.total_pages > 1 && (
-                <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
-                  <div className="flex items-center justify-between">
-                    <div className="text-sm text-gray-600">
-                      Showing page <span className="font-semibold">{currentPage}</span> of{' '}
-                      <span className="font-semibold">{pagination.total_pages}</span> ({pagination.count} total assets)
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <button
-                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                        disabled={!pagination.previous || currentPage === 1}
-                        className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                      >
-                        <i className="fas fa-chevron-left mr-1"></i>
-                        Previous
-                      </button>
-                      <div className="flex items-center space-x-1">
-                        {Array.from({ length: Math.min(5, pagination.total_pages) }, (_, i) => {
-                          let pageNum
-                          if (pagination.total_pages <= 5) {
-                            pageNum = i + 1
-                          } else if (currentPage <= 3) {
-                            pageNum = i + 1
-                          } else if (currentPage >= pagination.total_pages - 2) {
-                            pageNum = pagination.total_pages - 4 + i
-                          } else {
-                            pageNum = currentPage - 2 + i
-                          }
-                          return (
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold ${getAssetTypeColor(asset.asset_type)}`}>
+                          <i className={`fa-solid ${getAssetIcon(asset.asset_type)} text-[10px]`}></i>
+                          {asset.asset_type?.replace('_', ' ')}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${
+                          asset.is_active
+                            ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
+                            : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
+                        }`}>
+                          <i className={`fa-solid ${asset.is_active ? 'fa-circle-check' : 'fa-circle-xmark'} text-[10px]`}></i>
+                          {asset.is_active ? 'Active' : 'Inactive'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="text-sm text-slate-500 dark:text-slate-400">
+                          {asset.discovery_source || 'Manual'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="text-sm text-slate-500 dark:text-slate-400">
+                          {asset.first_seen ? new Date(asset.first_seen).toLocaleDateString() : '-'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleEditOwnership(asset)}
+                            className="p-2 rounded-lg text-slate-400 hover:text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors"
+                            title="Edit Ownership"
+                          >
+                            <i className="fa-solid fa-user-pen"></i>
+                          </button>
+                          {asset.is_unknown && (
                             <button
-                              key={pageNum}
-                              onClick={() => setCurrentPage(pageNum)}
-                              className={`px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
-                                currentPage === pageNum
-                                  ? 'bg-blue-600 text-white'
-                                  : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
-                              }`}
+                              onClick={async () => {
+                                if (window.confirm(`Mark "${asset.name}" as known?`)) {
+                                  try {
+                                    await axios.post(`/api/assets/${asset.id}/mark-known/`)
+                                    await fetchAssets()
+                                  } catch (error) {
+                                    console.error('Error marking asset as known:', error)
+                                  }
+                                }
+                              }}
+                              className="p-2 rounded-lg text-slate-400 hover:text-green-500 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors"
+                              title="Mark as Known"
                             >
-                              {pageNum}
+                              <i className="fa-solid fa-circle-check"></i>
                             </button>
-                          )
-                        })}
-                      </div>
-                      <button
-                        onClick={() => setCurrentPage(prev => Math.min(pagination.total_pages, prev + 1))}
-                        disabled={!pagination.next || currentPage === pagination.total_pages}
-                        className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                      >
-                        Next
-                        <i className="fas fa-chevron-right ml-1"></i>
-                      </button>
-                    </div>
+                          )}
+                          <Link
+                            to={`/org/assets/${asset.id}`}
+                            className="p-2 rounded-lg text-slate-400 hover:text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors"
+                            title="View Details"
+                          >
+                            <i className="fa-solid fa-arrow-right"></i>
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            
+            {/* Pagination */}
+            {pagination.total_pages > 1 && (
+              <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                    Page <span className="font-semibold text-slate-900 dark:text-white">{currentPage}</span> of{' '}
+                    <span className="font-semibold text-slate-900 dark:text-white">{pagination.total_pages}</span>
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                      disabled={currentPage === 1}
+                      className="btn btn-ghost btn-sm"
+                    >
+                      <i className="fa-solid fa-chevron-left"></i>
+                      <span>Previous</span>
+                    </button>
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.min(pagination.total_pages, prev + 1))}
+                      disabled={currentPage === pagination.total_pages}
+                      className="btn btn-ghost btn-sm"
+                    >
+                      <span>Next</span>
+                      <i className="fa-solid fa-chevron-right"></i>
+                    </button>
                   </div>
                 </div>
-              )}
-            </>
-          ) : (
-            <div className="p-12 text-center">
-              <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4">
-                <i className="fas fa-network-wired text-gray-400 text-2xl"></i>
               </div>
-              <h3 className="text-lg font-bold text-gray-900 mb-2">
-                {searchQuery || filters.asset_type || filters.is_active || filters.is_unknown
-                  ? 'No assets match your filters'
-                  : 'No assets found'}
-              </h3>
-              <p className="text-sm text-gray-600 mb-4">
-                {searchQuery || filters.asset_type || filters.is_active || filters.is_unknown
-                  ? 'Try adjusting your search or filter criteria'
-                  : 'Start by running an asset discovery scan'}
-              </p>
-              {!searchQuery && !filters.asset_type && !filters.is_active && !filters.is_unknown && (
-                <Link
-                  to="/org/asset-discovery"
-                  className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-[#00C8FF] to-[#0066FF] text-white font-semibold rounded-lg shadow-md hover:from-[#00B8E6] hover:to-[#0055E6] transition-all"
-                >
-                  <i className="fas fa-search mr-2"></i>
-                  Run Asset Discovery
-                </Link>
-              )}
+            )}
+          </>
+        ) : (
+          <div className="p-12 text-center">
+            <div className="w-16 h-16 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto mb-4">
+              <i className="fa-solid fa-server text-2xl text-slate-400"></i>
             </div>
-          )}
-        </div>
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
+              {searchQuery || filters.asset_type || filters.is_active || filters.is_unknown
+                ? 'No assets match your filters'
+                : 'No assets found'}
+            </h3>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+              {searchQuery || filters.asset_type || filters.is_active || filters.is_unknown
+                ? 'Try adjusting your search or filter criteria'
+                : 'Start by running an asset discovery scan'}
+            </p>
+            {!searchQuery && !filters.asset_type && !filters.is_active && !filters.is_unknown && (
+              <Link to="/org/asset-discovery" className="btn btn-primary">
+                <i className="fa-solid fa-satellite-dish"></i>
+                <span>Run Asset Discovery</span>
+              </Link>
+            )}
+          </div>
+        )}
+      </div>
 
-        {/* Ownership Edit Modal */}
-        {showOwnershipModal && selectedAsset && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+      {/* Ownership Modal */}
+      {showOwnershipModal && selectedAsset && (
+        <>
+          <div 
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50"
+            onClick={() => setShowOwnershipModal(false)}
+          />
+          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md z-50 p-4">
+            <div className="card p-6 animate-scale-in">
               <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center space-x-3">
-                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center">
-                    <i className="fas fa-user-edit text-white text-xl"></i>
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center">
+                    <i className="fa-solid fa-user-pen text-white text-lg"></i>
                   </div>
                   <div>
-                    <h2 className="text-2xl font-bold text-gray-900">Edit Ownership</h2>
-                    <p className="text-sm text-gray-500">{selectedAsset.name}</p>
+                    <h2 className="text-xl font-bold text-slate-900 dark:text-white">Edit Ownership</h2>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">{selectedAsset.name}</p>
                   </div>
                 </div>
                 <button
                   onClick={() => setShowOwnershipModal(false)}
-                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                  className="p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                 >
-                  <i className="fas fa-times text-xl"></i>
+                  <i className="fa-solid fa-xmark"></i>
                 </button>
               </div>
 
               <form onSubmit={(e) => { e.preventDefault(); handleSaveOwnership(); }} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    <i className="fas fa-building mr-2 text-blue-600"></i>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                     Department
                   </label>
                   <input
                     type="text"
                     value={ownershipForm.department}
                     onChange={(e) => setOwnershipForm({ ...ownershipForm, department: e.target.value })}
-                    placeholder="e.g., IT Operations, Engineering"
-                    className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="e.g., IT Operations"
+                    className="input"
                   />
                 </div>
-
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    <i className="fas fa-user mr-2 text-blue-600"></i>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                     Owner Name
                   </label>
                   <input
                     type="text"
                     value={ownershipForm.owner_name}
                     onChange={(e) => setOwnershipForm({ ...ownershipForm, owner_name: e.target.value })}
-                    placeholder="e.g., John Doe, API Team"
-                    className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="e.g., John Doe"
+                    className="input"
                   />
                 </div>
-
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    <i className="fas fa-envelope mr-2 text-blue-600"></i>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                     Owner Email
                   </label>
                   <input
                     type="email"
                     value={ownershipForm.owner_email}
                     onChange={(e) => setOwnershipForm({ ...ownershipForm, owner_email: e.target.value })}
-                    placeholder="e.g., owner@example.com"
-                    className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="e.g., john@example.com"
+                    className="input"
                   />
                 </div>
-
-                <div className="flex items-center justify-end space-x-3 pt-4 border-t border-gray-200">
+                <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-700">
                   <button
                     type="button"
                     onClick={() => setShowOwnershipModal(false)}
-                    className="px-6 py-2.5 text-sm font-medium text-gray-700 bg-white border-2 border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                    className="btn btn-ghost"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={savingOwnership}
-                    className="px-6 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-[#00C8FF] to-[#0066FF] rounded-lg hover:from-[#00B8E6] hover:to-[#0066FF] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                    className="btn btn-primary"
                   >
-                    {savingOwnership ? 'Saving...' : 'Save Ownership'}
+                    {savingOwnership ? (
+                      <>
+                        <i className="fa-solid fa-spinner animate-spin"></i>
+                        <span>Saving...</span>
+                      </>
+                    ) : (
+                      <>
+                        <i className="fa-solid fa-check"></i>
+                        <span>Save</span>
+                      </>
+                    )}
                   </button>
                 </div>
               </form>
             </div>
           </div>
-        )}
-      </div>
-    </Layout>
+        </>
+      )}
+    </div>
   )
 }
 
 export default Assets
-

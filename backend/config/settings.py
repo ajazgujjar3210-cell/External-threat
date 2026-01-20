@@ -165,13 +165,18 @@ CELERY_TASK_TIME_LIMIT = 30 * 60  # 30 minutes
 CELERY_TASK_SOFT_TIME_LIMIT = 25 * 60  # 25 minutes
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True  # Retry broker connection on startup (Celery 6.0+)
 
+# Run Celery tasks synchronously (without Celery worker) in development
+# Set to False when using Celery worker (recommended)
+CELERY_TASK_ALWAYS_EAGER = config('CELERY_TASK_ALWAYS_EAGER', default=False, cast=bool)
+CELERY_TASK_EAGER_PROPAGATES = True
+
 # Email Configuration
 EMAIL_BACKEND = config('EMAIL_BACKEND', default='django.core.mail.backends.smtp.EmailBackend')
 EMAIL_HOST = config('EMAIL_HOST', default='smtp.gmail.com')
 EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
 EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
 EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='tufailijaz353@gmail.com')
-EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
+EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='yridogxcztouhxji')
 DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='tufailijaz353@gmail.com')
 
 # Frontend URL for invitation links

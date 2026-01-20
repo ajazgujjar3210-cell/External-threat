@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import Layout from '../components/Layout'
+// Layout is now handled by ProtectedRoute
 import axios from 'axios'
 
 const Organizations = () => {
@@ -58,7 +58,7 @@ const Organizations = () => {
   }
 
   return (
-    <Layout>
+    <>
       <div className="space-y-8">
         <div className="flex items-center justify-between">
           <div>
@@ -242,7 +242,7 @@ const Organizations = () => {
           </div>
         )}
       </div>
-    </Layout>
+    </>
   )
 }
 

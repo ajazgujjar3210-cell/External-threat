@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
-import Layout from '../components/Layout'
+// Layout is now handled by ProtectedRoute
 
 const Notifications = () => {
   const [notifications, setNotifications] = useState([])
@@ -81,7 +81,7 @@ const Notifications = () => {
   const unreadCount = notifications.filter((n) => !n.is_read).length
 
   return (
-    <Layout>
+    <>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -215,7 +215,7 @@ const Notifications = () => {
           </div>
         )}
       </div>
-    </Layout>
+    </>
   )
 }
 

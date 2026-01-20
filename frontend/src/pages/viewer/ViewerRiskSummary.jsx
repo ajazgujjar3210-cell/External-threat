@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import Layout from '../../components/Layout'
+// Layout is now handled by ProtectedRoute
 import axios from 'axios'
 
 const ViewerRiskSummary = () => {
@@ -30,7 +30,7 @@ const ViewerRiskSummary = () => {
   }
 
   return (
-    <Layout>
+    <>
       <div className="space-y-8">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Risk Summary</h1>
@@ -82,7 +82,7 @@ const ViewerRiskSummary = () => {
           )}
         </div>
       </div>
-    </Layout>
+    </>
   )
 }
 

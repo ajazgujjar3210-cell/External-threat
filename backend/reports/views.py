@@ -4,7 +4,7 @@ Views for reports app.
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework import generics
 from rest_framework.response import Response
-from accounts.permissions import IsViewerOrAbove
+from accounts.permissions import IsViewerOrAbove, IsUserOrAbove
 from accounts.models import Organization
 from .generator import (
     generate_asset_inventory_report,
@@ -23,9 +23,9 @@ from datetime import timedelta
 
 
 @api_view(['GET'])
-@permission_classes([IsViewerOrAbove])
+@permission_classes([IsUserOrAbove])  # Viewers cannot generate reports
 def generate_report(request):
-    """Generate report endpoint."""
+    """Generate report endpoint. Viewers cannot generate reports."""
     report_type = request.query_params.get('type', 'inventory')
     format_type = request.query_params.get('format', 'csv')
     
@@ -56,7 +56,11 @@ def generate_report(request):
 
 
 class ScheduledReportListView(generics.ListCreateAPIView):
-    """List and create scheduled reports."""
+    """
+    List and create scheduled reports.
+    - Viewers: Read-only (can only list)
+    - Users and above: Can create scheduled reports
+    """
     serializer_class = ScheduledReportSerializer
     permission_classes = [IsViewerOrAbove]
     
@@ -69,6 +73,13 @@ class ScheduledReportListView(generics.ListCreateAPIView):
     
     def perform_create(self, serializer):
         """Create scheduled report."""
+        # Check if viewer (read-only)
+        if self.request.user.role == 'viewer':
+            from rest_framework import serializers as drf_serializers
+            raise drf_serializers.ValidationError({
+                'error': 'Viewers have read-only access. Cannot create scheduled reports.'
+            })
+        
         user = self.request.user
         if user.role == 'super_admin':
             org_id = self.request.data.get('organization')
@@ -95,7 +106,11 @@ class ScheduledReportListView(generics.ListCreateAPIView):
 
 
 class ScheduledReportDetailView(generics.RetrieveUpdateDestroyAPIView):
-    """Scheduled report detail view."""
+    """
+    Scheduled report detail view.
+    - Viewers: Read-only (can only retrieve)
+    - Users and above: Can update/delete
+    """
     serializer_class = ScheduledReportSerializer
     permission_classes = [IsViewerOrAbove]
     
@@ -105,3 +120,25 @@ class ScheduledReportDetailView(generics.RetrieveUpdateDestroyAPIView):
         if user.role == 'super_admin':
             return ScheduledReport.objects.all()
         return ScheduledReport.objects.filter(organization=user.organization)
+    
+    def update(self, request, *args, **kwargs):
+        """Update scheduled report - viewers cannot update."""
+        if request.user.role == 'viewer':
+            from rest_framework.response import Response
+            from rest_framework import status
+            return Response(
+                {'error': 'Viewers have read-only access. Cannot update scheduled reports.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        return super().update(request, *args, **kwargs)
+    
+    def destroy(self, request, *args, **kwargs):
+        """Delete scheduled report - viewers cannot delete."""
+        if request.user.role == 'viewer':
+            from rest_framework.response import Response
+            from rest_framework import status
+            return Response(
+                {'error': 'Viewers have read-only access. Cannot delete scheduled reports.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        return super().destroy(request, *args, **kwargs)

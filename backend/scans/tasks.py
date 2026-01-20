@@ -6,6 +6,7 @@ from django.utils import timezone
 from .models import ScanRun, ScheduledDiscovery
 from assets.models import Asset, AssetChange
 from scans.change_detection import process_scan_snapshot
+from scans.alerts import alert_discovery_completion
 from vulnerabilities.models import Vulnerability
 from .discovery_helpers import (
     resolve_dns,
@@ -40,13 +41,49 @@ def run_discovery_scan(scan_run_id, organization_id, domain=None, enable_port_sc
     - Services (optional, if enable_service_detection=True)
     """
     import logging
+    import time
     from accounts.models import Organization
     
     # Initialize logger at the very start to avoid UnboundLocalError
     logger = logging.getLogger(__name__)
     
+    # Initialize scan_run to None to handle exception cases
+    scan_run = None
+    
+    def check_if_stopped():
+        """Check if the scan has been stopped by the user."""
+        try:
+            # Refresh scan_run from database to get latest status
+            scan_run.refresh_from_db()
+            if scan_run.status == 'stopped':
+                logger.info(f"Scan {scan_run_id} was stopped by user")
+                return True
+        except Exception as e:
+            logger.warning(f"Error checking scan status: {str(e)}")
+        return False
+    
     try:
-        scan_run = ScanRun.objects.get(id=scan_run_id)
+        # Retry logic to handle database transaction timing issues
+        max_retries = 5
+        retry_delay = 1  # seconds
+        
+        for attempt in range(max_retries):
+            try:
+                scan_run = ScanRun.objects.get(id=scan_run_id)
+                break
+            except ScanRun.DoesNotExist:
+                if attempt < max_retries - 1:
+                    logger.warning(f"ScanRun {scan_run_id} not found, retrying in {retry_delay}s (attempt {attempt + 1}/{max_retries})")
+                    time.sleep(retry_delay)
+                else:
+                    logger.error(f"ScanRun {scan_run_id} not found after {max_retries} attempts")
+                    raise
+        
+        # Check if already stopped before we even start
+        if scan_run.status == 'stopped':
+            logger.info(f"Scan {scan_run_id} was already stopped before starting")
+            return "Scan was stopped before starting"
+        
         organization = Organization.objects.get(id=organization_id)
         
         scan_run.status = 'running'
@@ -58,9 +95,17 @@ def run_discovery_scan(scan_run_id, organization_id, domain=None, enable_port_sc
         
         # Safe discovery methods (passive first)
         if domain:
+            # Check if stopped before crt.sh
+            if check_if_stopped():
+                return "Scan was stopped by user"
+            
             # Method 1: crt.sh certificate transparency logs
             try:
                 crt_assets = discover_via_crtsh(domain)
+                # Check if stopped after crt.sh (long-running operation)
+                if check_if_stopped():
+                    logger.info(f"Scan {scan_run_id} was stopped by user after crt.sh discovery")
+                    return "Scan was stopped by user"
                 # Limit crt.sh results if we're approaching the limit
                 remaining_limit = MAX_ASSETS_LIMIT - len(discovered_assets)
                 if remaining_limit > 0:
@@ -70,10 +115,19 @@ def run_discovery_scan(scan_run_id, organization_id, domain=None, enable_port_sc
             except Exception as e:
                 scan_run.error_message = f"crt.sh error: {str(e)}"
         
+        # Check if stopped before Subfinder
+        if check_if_stopped():
+            logger.info(f"Scan {scan_run_id} was stopped by user before Subfinder")
+            return "Scan was stopped by user"
+        
         # Method 2: Subfinder (if available)
         if domain and len(discovered_assets) < MAX_ASSETS_LIMIT:
             try:
                 subfinder_assets = discover_via_subfinder(domain)
+                # Check if stopped immediately after Subfinder (long-running operation)
+                if check_if_stopped():
+                    logger.info(f"Scan {scan_run_id} was stopped by user after Subfinder discovery")
+                    return "Scan was stopped by user"
                 if subfinder_assets:
                     # Limit Subfinder results to stay within max limit
                     remaining_limit = MAX_ASSETS_LIMIT - len(discovered_assets)
@@ -112,11 +166,20 @@ def run_discovery_scan(scan_run_id, organization_id, domain=None, enable_port_sc
         discovered_assets = deduplicated_assets
         logger.info(f"After deduplication: {len(discovered_assets)} unique assets")
         
+        # Check if stopped before IP resolution
+        if check_if_stopped():
+            return "Scan was stopped by user"
+        
         # Step 2: Resolve IP addresses from subdomains/domains
         logger.info("Starting IP resolution from discovered subdomains/domains")
         ip_assets = []
         seen_ips = set()
-        for asset_data in discovered_assets[:1000]:  # Limit DNS lookups to prevent timeout
+        for idx, asset_data in enumerate(discovered_assets[:1000]):  # Limit DNS lookups to prevent timeout
+            # Check for stop every 50 iterations during IP resolution
+            if idx > 0 and idx % 50 == 0:
+                if check_if_stopped():
+                    logger.info(f"Scan {scan_run_id} was stopped by user during IP resolution")
+                    return "Scan was stopped by user"
             if asset_data['type'] in ['subdomain', 'domain']:
                 try:
                     ip_addresses = resolve_dns(asset_data['name'])
@@ -135,6 +198,10 @@ def run_discovery_scan(scan_run_id, organization_id, domain=None, enable_port_sc
         discovered_assets.extend(ip_assets)
         logger.info(f"Resolved {len(ip_assets)} unique IP addresses")
         
+        # Check if stopped before web service detection
+        if check_if_stopped():
+            return "Scan was stopped by user"
+        
         # Step 3: Detect web services (HTTP/HTTPS)
         logger.info("Starting web service detection")
         web_service_assets = []
@@ -142,6 +209,11 @@ def run_discovery_scan(scan_run_id, organization_id, domain=None, enable_port_sc
         import time
         
         for idx, asset_data in enumerate(discovered_assets[:500]):  # Limit to prevent timeout
+            # Check for stop every 20 iterations during web service detection
+            if idx > 0 and idx % 20 == 0:
+                if check_if_stopped():
+                    logger.info(f"Scan {scan_run_id} was stopped by user during web service detection")
+                    return "Scan was stopped by user"
             if asset_data['type'] in ['subdomain', 'domain']:
                 try:
                     # Add small delay between requests to avoid rate limiting
@@ -174,11 +246,20 @@ def run_discovery_scan(scan_run_id, organization_id, domain=None, enable_port_sc
         discovered_assets.extend(web_service_assets)
         logger.info(f"Detected {len(web_service_assets)} unique web services")
         
+        # Check if stopped before web application detection
+        if check_if_stopped():
+            return "Scan was stopped by user"
+        
         # Step 4: Detect web applications (if web service found)
         logger.info("Starting web application detection")
         web_app_assets = []
         seen_web_apps = set()  # Track by hostname to avoid duplicates
         for idx, asset_data in enumerate(web_service_assets[:200]):  # Limit to prevent timeout
+            # Check for stop every 20 iterations during web application detection
+            if idx > 0 and idx % 20 == 0:
+                if check_if_stopped():
+                    logger.info(f"Scan {scan_run_id} was stopped by user during web application detection")
+                    return "Scan was stopped by user"
             try:
                 # Add small delay between requests to avoid rate limiting
                 if idx > 0 and idx % 10 == 0:
@@ -206,6 +287,10 @@ def run_discovery_scan(scan_run_id, organization_id, domain=None, enable_port_sc
         discovered_assets.extend(web_app_assets)
         logger.info(f"Detected {len(web_app_assets)} unique web applications")
         
+        # Check if stopped before port scanning
+        if check_if_stopped():
+            return "Scan was stopped by user"
+        
         # Step 5: Port scanning (optional, if enabled)
         port_assets = []
         if enable_port_scan:
@@ -228,6 +313,10 @@ def run_discovery_scan(scan_run_id, organization_id, domain=None, enable_port_sc
             discovered_assets.extend(port_assets)
             logger.info(f"Found {len(port_assets)} open ports")
         
+        # Check if stopped before service detection
+        if check_if_stopped():
+            return "Scan was stopped by user"
+        
         # Step 6: Service detection (optional, if enabled and ports found)
         service_assets = []
         if enable_service_detection and port_assets:
@@ -248,6 +337,10 @@ def run_discovery_scan(scan_run_id, organization_id, domain=None, enable_port_sc
             
             discovered_assets.extend(service_assets)
             logger.info(f"Detected {len(service_assets)} services")
+        
+        # Final check if stopped before saving assets
+        if check_if_stopped():
+            return "Scan was stopped by user"
         
         # Apply final limit
         if len(discovered_assets) > MAX_ASSETS_LIMIT:
@@ -282,7 +375,12 @@ def run_discovery_scan(scan_run_id, organization_id, domain=None, enable_port_sc
         
         # Deduplicate and save assets
         saved_count = 0
-        for asset_data in discovered_assets:
+        for idx, asset_data in enumerate(discovered_assets):
+            # Check for stop every 100 assets during saving
+            if idx > 0 and idx % 100 == 0:
+                if check_if_stopped():
+                    logger.info(f"Scan {scan_run_id} was stopped by user during asset saving (saved {saved_count} assets so far)")
+                    return f"Scan was stopped by user (saved {saved_count} assets)"
             asset, created = Asset.objects.get_or_create(
                 organization=organization,
                 name=asset_data['name'],
@@ -377,13 +475,24 @@ def run_discovery_scan(scan_run_id, organization_id, domain=None, enable_port_sc
         }
         scan_run.save()
         
+        # Send discovery completion email notification
+        try:
+            alert_discovery_completion(scan_run)
+            logger.info(f"Discovery completion email sent for scan {scan_run.id}")
+        except Exception as e:
+            logger.error(f"Failed to send discovery completion email: {str(e)}")
+        
         return f"Discovery completed: {saved_count} new assets found"
         
     except Exception as e:
-        scan_run.status = 'failed'
-        scan_run.error_message = str(e)
-        scan_run.finished_at = timezone.now()
-        scan_run.save()
+        # Only update scan_run if it was successfully fetched
+        if scan_run is not None:
+            scan_run.status = 'failed'
+            scan_run.error_message = str(e)
+            scan_run.finished_at = timezone.now()
+            scan_run.save()
+        else:
+            logger.error(f"Failed to run discovery scan {scan_run_id}: {str(e)}")
         raise
 
 

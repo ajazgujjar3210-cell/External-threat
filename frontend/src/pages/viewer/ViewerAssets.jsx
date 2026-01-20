@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import Layout from '../../components/Layout'
+// Layout is now handled by ProtectedRoute
 import axios from 'axios'
 
 const ViewerAssets = () => {
@@ -31,7 +31,7 @@ const ViewerAssets = () => {
   }
 
   return (
-    <Layout>
+    <>
       <div className="space-y-8">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Assets</h1>
@@ -143,7 +143,7 @@ const ViewerAssets = () => {
           )}
         </div>
       </div>
-    </Layout>
+    </>
   )
 }
 

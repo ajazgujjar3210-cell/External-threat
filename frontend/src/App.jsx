@@ -204,7 +204,7 @@ function App() {
           <Route
             path="/org/users/list"
             element={
-              <ProtectedRoute requiredRole="org_admin">
+              <ProtectedRoute allowedRoles={['super_admin', 'org_admin']}>
                 <Users />
               </ProtectedRoute>
             }
@@ -212,7 +212,7 @@ function App() {
           <Route
             path="/users"
             element={
-              <ProtectedRoute requiredRole="org_admin">
+              <ProtectedRoute allowedRoles={['super_admin', 'org_admin']}>
                 <Users />
               </ProtectedRoute>
             }

@@ -1,18 +1,44 @@
 import { useState, useEffect } from 'react'
-import Layout from '../components/Layout'
 import axios from 'axios'
 
 const Vulnerabilities = () => {
   const [vulnerabilities, setVulnerabilities] = useState([])
   const [loading, setLoading] = useState(true)
+  const [searchQuery, setSearchQuery] = useState('')
   const [filters, setFilters] = useState({
     severity: '',
     status: '',
+  })
+  const [selectedVuln, setSelectedVuln] = useState(null)
+  const [stats, setStats] = useState({
+    total: 0,
+    critical: 0,
+    high: 0,
+    medium: 0,
+    low: 0,
+    open: 0,
   })
 
   useEffect(() => {
     fetchVulnerabilities()
   }, [filters])
+
+  useEffect(() => {
+    const critical = vulnerabilities.filter(v => v.severity === 'critical').length
+    const high = vulnerabilities.filter(v => v.severity === 'high').length
+    const medium = vulnerabilities.filter(v => v.severity === 'medium').length
+    const low = vulnerabilities.filter(v => v.severity === 'low').length
+    const open = vulnerabilities.filter(v => v.status === 'open').length
+    
+    setStats({
+      total: vulnerabilities.length,
+      critical,
+      high,
+      medium,
+      low,
+      open,
+    })
+  }, [vulnerabilities])
 
   const fetchVulnerabilities = async () => {
     try {
@@ -30,151 +56,209 @@ const Vulnerabilities = () => {
     }
   }
 
-  const getSeverityColor = (severity) => {
-    const colors = {
-      critical: 'bg-red-100 text-red-700',
-      high: 'bg-orange-100 text-orange-700',
-      medium: 'bg-amber-100 text-amber-700',
-      low: 'bg-blue-100 text-blue-700',
-      info: 'bg-gray-100 text-gray-700',
+  const getSeverityConfig = (severity) => {
+    const configs = {
+      critical: { 
+        color: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800',
+        icon: 'fa-skull-crossbones',
+        gradient: 'from-red-500 to-rose-600',
+        bgLight: 'bg-red-50 dark:bg-red-900/20'
+      },
+      high: { 
+        color: 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-800',
+        icon: 'fa-triangle-exclamation',
+        gradient: 'from-orange-500 to-amber-600',
+        bgLight: 'bg-orange-50 dark:bg-orange-900/20'
+      },
+      medium: { 
+        color: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800',
+        icon: 'fa-circle-exclamation',
+        gradient: 'from-amber-500 to-yellow-600',
+        bgLight: 'bg-amber-50 dark:bg-amber-900/20'
+      },
+      low: { 
+        color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800',
+        icon: 'fa-circle-info',
+        gradient: 'from-blue-500 to-cyan-600',
+        bgLight: 'bg-blue-50 dark:bg-blue-900/20'
+      },
+      info: { 
+        color: 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-400 border-slate-200 dark:border-slate-700',
+        icon: 'fa-info',
+        gradient: 'from-slate-500 to-slate-600',
+        bgLight: 'bg-slate-50 dark:bg-slate-800/50'
+      },
     }
-    return colors[severity] || colors.info
+    return configs[severity] || configs.info
   }
 
-  const [stats, setStats] = useState({
-    total: 0,
-    critical: 0,
-    high: 0,
-    medium: 0,
-    low: 0,
-    open: 0,
+  const getStatusConfig = (status) => {
+    const configs = {
+      open: { 
+        color: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400',
+        icon: 'fa-circle-dot'
+      },
+      in_progress: { 
+        color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400',
+        icon: 'fa-spinner'
+      },
+      resolved: { 
+        color: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400',
+        icon: 'fa-circle-check'
+      },
+      false_positive: { 
+        color: 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-400',
+        icon: 'fa-ban'
+      },
+      risk_accepted: { 
+        color: 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400',
+        icon: 'fa-hand'
+      },
+    }
+    return configs[status] || configs.open
+  }
+
+  const filteredVulnerabilities = vulnerabilities.filter(vuln => {
+    if (!searchQuery) return true
+    const query = searchQuery.toLowerCase()
+    return (
+      vuln.title?.toLowerCase().includes(query) ||
+      vuln.description?.toLowerCase().includes(query) ||
+      vuln.asset_name?.toLowerCase().includes(query)
+    )
   })
 
-  useEffect(() => {
-    fetchVulnerabilities()
-  }, [filters])
-
-  useEffect(() => {
-    // Calculate statistics
-    const critical = vulnerabilities.filter(v => v.severity === 'critical').length
-    const high = vulnerabilities.filter(v => v.severity === 'high').length
-    const medium = vulnerabilities.filter(v => v.severity === 'medium').length
-    const low = vulnerabilities.filter(v => v.severity === 'low').length
-    const open = vulnerabilities.filter(v => v.status === 'open').length
-    
-    setStats({
-      total: vulnerabilities.length,
-      critical,
-      high,
-      medium,
-      low,
-      open,
-    })
-  }, [vulnerabilities])
+  const StatCard = ({ title, value, icon, gradient, delay = 0 }) => (
+    <div 
+      className="stat-card group animate-fade-in-up"
+      style={{ animationDelay: `${delay}ms` }}
+    >
+      <div className="flex items-start justify-between">
+        <div className="flex-1">
+          <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">{title}</p>
+          <p className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight">
+            {loading ? (
+              <span className="inline-block w-12 h-8 bg-slate-200 dark:bg-slate-700 rounded animate-pulse"></span>
+            ) : (
+              value?.toLocaleString()
+            )}
+          </p>
+        </div>
+        <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${gradient} flex items-center justify-center shadow-lg transition-transform group-hover:scale-110`}>
+          <i className={`fa-solid ${icon} text-white text-lg`}></i>
+        </div>
+      </div>
+    </div>
+  )
 
   return (
-    <Layout>
-      <div className="space-y-6 md:space-y-8 fade-in">
-        {/* Header Section - Enterprise Grade */}
-        <div className="space-y-2">
-          <h1 className="text-4xl md:text-5xl font-extrabold bg-gradient-to-r from-[#00C8FF] via-[#0066FF] to-[#7C3AED] bg-clip-text text-transparent tracking-tight">
+    <div className="space-y-6">
+      {/* Page Header */}
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 animate-fade-in">
+        <div>
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight">
             Vulnerabilities
           </h1>
-          <p className="text-gray-600 text-base md:text-lg font-medium">Security vulnerabilities and exposures</p>
+          <p className="text-slate-500 dark:text-slate-400 mt-1">
+            Security vulnerabilities and exposures across your assets
+          </p>
         </div>
-
-        {/* Statistics Cards - Enterprise Glassmorphism */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 md:gap-6">
-          <div className="group relative backdrop-blur-xl bg-gradient-to-br from-red-500/90 to-rose-500/90 rounded-2xl p-6 text-white shadow-2xl shadow-red-500/20 border border-white/20 hover:shadow-3xl hover:shadow-red-500/30 hover:scale-105 transition-all duration-300 cursor-pointer overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
-            <div className="relative z-10 flex items-center justify-between">
-              <div className="space-y-1">
-                <p className="text-red-100 text-sm font-bold uppercase tracking-wide">Critical</p>
-                <p className="text-4xl font-extrabold drop-shadow-lg">{stats.critical}</p>
-              </div>
-              <div className="w-14 h-14 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center shadow-lg transform transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6">
-                <i className="fas fa-exclamation-triangle text-white text-xl"></i>
-              </div>
-            </div>
-          </div>
-
-          <div className="group relative backdrop-blur-xl bg-gradient-to-br from-orange-500/90 to-amber-500/90 rounded-2xl p-6 text-white shadow-2xl shadow-orange-500/20 border border-white/20 hover:shadow-3xl hover:shadow-orange-500/30 hover:scale-105 transition-all duration-300 cursor-pointer overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
-            <div className="relative z-10 flex items-center justify-between">
-              <div className="space-y-1">
-                <p className="text-orange-100 text-sm font-bold uppercase tracking-wide">High</p>
-                <p className="text-4xl font-extrabold drop-shadow-lg">{stats.high}</p>
-              </div>
-              <div className="w-14 h-14 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center shadow-lg transform transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6">
-                <i className="fas fa-exclamation-circle text-white text-xl"></i>
-              </div>
-            </div>
-          </div>
-
-          <div className="group relative backdrop-blur-xl bg-gradient-to-br from-amber-500/90 to-yellow-500/90 rounded-2xl p-6 text-white shadow-2xl shadow-amber-500/20 border border-white/20 hover:shadow-3xl hover:shadow-amber-500/30 hover:scale-105 transition-all duration-300 cursor-pointer overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
-            <div className="relative z-10 flex items-center justify-between">
-              <div className="space-y-1">
-                <p className="text-amber-100 text-sm font-bold uppercase tracking-wide">Medium</p>
-                <p className="text-4xl font-extrabold drop-shadow-lg">{stats.medium}</p>
-              </div>
-              <div className="w-14 h-14 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center shadow-lg transform transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6">
-                <i className="fas fa-info-circle text-white text-xl"></i>
-              </div>
-            </div>
-          </div>
-
-          <div className="group relative backdrop-blur-xl bg-gradient-to-br from-blue-500/90 to-cyan-500/90 rounded-2xl p-6 text-white shadow-2xl shadow-blue-500/20 border border-white/20 hover:shadow-3xl hover:shadow-blue-500/30 hover:scale-105 transition-all duration-300 cursor-pointer overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
-            <div className="relative z-10 flex items-center justify-between">
-              <div className="space-y-1">
-                <p className="text-blue-100 text-sm font-bold uppercase tracking-wide">Low</p>
-                <p className="text-4xl font-extrabold drop-shadow-lg">{stats.low}</p>
-              </div>
-              <div className="w-14 h-14 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center shadow-lg transform transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6">
-                <i className="fas fa-info text-white text-xl"></i>
-              </div>
-            </div>
-          </div>
-
-          <div className="group relative backdrop-blur-xl bg-gradient-to-br from-purple-500/90 to-indigo-500/90 rounded-2xl p-6 text-white shadow-2xl shadow-purple-500/20 border border-white/20 hover:shadow-3xl hover:shadow-purple-500/30 hover:scale-105 transition-all duration-300 cursor-pointer overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
-            <div className="relative z-10 flex items-center justify-between">
-              <div className="space-y-1">
-                <p className="text-purple-100 text-sm font-bold uppercase tracking-wide">Open</p>
-                <p className="text-4xl font-extrabold drop-shadow-lg">{stats.open}</p>
-              </div>
-              <div className="w-14 h-14 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center shadow-lg transform transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6">
-                <i className="fas fa-clock text-white text-xl"></i>
-              </div>
-            </div>
-          </div>
-
-          <div className="group relative backdrop-blur-xl bg-gradient-to-br from-gray-500/90 to-slate-500/90 rounded-2xl p-6 text-white shadow-2xl shadow-gray-500/20 border border-white/20 hover:shadow-3xl hover:shadow-gray-500/30 hover:scale-105 transition-all duration-300 cursor-pointer overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
-            <div className="relative z-10 flex items-center justify-between">
-              <div className="space-y-1">
-                <p className="text-gray-100 text-sm font-bold uppercase tracking-wide">Total</p>
-                <p className="text-4xl font-extrabold drop-shadow-lg">{stats.total}</p>
-              </div>
-              <div className="w-14 h-14 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center shadow-lg transform transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6">
-                <i className="fas fa-shield-alt text-white text-xl"></i>
-              </div>
-            </div>
-          </div>
+        <div className="flex items-center gap-3">
+          <button className="btn btn-secondary">
+            <i className="fa-solid fa-download"></i>
+            <span>Export</span>
+          </button>
+          <button 
+            onClick={fetchVulnerabilities}
+            className="btn btn-primary"
+          >
+            <i className="fa-solid fa-rotate"></i>
+            <span>Refresh</span>
+          </button>
         </div>
+      </div>
 
-        {/* Filters - Modern Glassmorphism */}
-        <div className="backdrop-blur-xl bg-white/80 rounded-2xl shadow-2xl shadow-blue-500/10 border border-white/20 p-6 md:p-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* Statistics Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+        <StatCard
+          title="Critical"
+          value={stats.critical}
+          icon="fa-skull-crossbones"
+          gradient="from-red-500 to-rose-600"
+          delay={0}
+        />
+        <StatCard
+          title="High"
+          value={stats.high}
+          icon="fa-triangle-exclamation"
+          gradient="from-orange-500 to-amber-600"
+          delay={50}
+        />
+        <StatCard
+          title="Medium"
+          value={stats.medium}
+          icon="fa-circle-exclamation"
+          gradient="from-amber-500 to-yellow-600"
+          delay={100}
+        />
+        <StatCard
+          title="Low"
+          value={stats.low}
+          icon="fa-circle-info"
+          gradient="from-blue-500 to-cyan-600"
+          delay={150}
+        />
+        <StatCard
+          title="Open"
+          value={stats.open}
+          icon="fa-circle-dot"
+          gradient="from-purple-500 to-violet-600"
+          delay={200}
+        />
+        <StatCard
+          title="Total"
+          value={stats.total}
+          icon="fa-bug"
+          gradient="from-slate-500 to-slate-600"
+          delay={250}
+        />
+      </div>
+
+      {/* Search and Filters */}
+      <div className="card p-6 animate-fade-in-up" style={{ animationDelay: '300ms' }}>
+        <div className="space-y-4">
+          {/* Search Bar */}
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+              <i className="fa-solid fa-magnifying-glass text-slate-400"></i>
+            </div>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search vulnerabilities by title, description, or asset..."
+              className="input pl-11"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+              >
+                <i className="fa-solid fa-xmark"></i>
+              </button>
+            )}
+          </div>
+
+          {/* Filters */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-slate-200 dark:border-slate-700">
             <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2.5 flex items-center">
-                <i className="fas fa-filter mr-2 text-[#00C8FF]"></i>Severity
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                Severity
               </label>
               <select
                 value={filters.severity}
                 onChange={(e) => setFilters({ ...filters, severity: e.target.value })}
-                className="w-full px-4 py-3 bg-white/60 backdrop-blur-sm border-2 border-gray-200/50 rounded-xl focus:ring-2 focus:ring-[#00C8FF]/50 focus:border-[#00C8FF] transition-all duration-300 font-medium text-gray-800"
+                className="input"
               >
                 <option value="">All Severities</option>
                 <option value="critical">Critical</option>
@@ -185,13 +269,13 @@ const Vulnerabilities = () => {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2.5 flex items-center">
-                <i className="fas fa-toggle-on mr-2 text-[#00C8FF]"></i>Status
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                Status
               </label>
               <select
                 value={filters.status}
                 onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-                className="w-full px-4 py-3 bg-white/60 backdrop-blur-sm border-2 border-gray-200/50 rounded-xl focus:ring-2 focus:ring-[#00C8FF]/50 focus:border-[#00C8FF] transition-all duration-300 font-medium text-gray-800"
+                className="input"
               >
                 <option value="">All Status</option>
                 <option value="open">Open</option>
@@ -201,141 +285,333 @@ const Vulnerabilities = () => {
                 <option value="risk_accepted">Risk Accepted</option>
               </select>
             </div>
+            <div className="flex items-end">
+              {(filters.severity || filters.status || searchQuery) && (
+                <button
+                  onClick={() => {
+                    setFilters({ severity: '', status: '' })
+                    setSearchQuery('')
+                  }}
+                  className="btn btn-ghost w-full"
+                >
+                  <i className="fa-solid fa-rotate-left"></i>
+                  <span>Clear Filters</span>
+                </button>
+              )}
+            </div>
           </div>
         </div>
+      </div>
 
-        {/* Vulnerabilities Table - Modern Glassmorphism */}
-        <div className="backdrop-blur-xl bg-white/80 rounded-2xl shadow-2xl shadow-blue-500/10 border border-white/20 overflow-hidden">
-          {loading ? (
-            <div className="p-12 text-center">
-              <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-[#00C8FF] border-t-transparent"></div>
-              <p className="mt-4 text-gray-600 font-medium">Loading vulnerabilities...</p>
-            </div>
-          ) : vulnerabilities.length > 0 ? (
-            <>
-              <div className="px-6 md:px-8 py-5 border-b border-gray-200/50 bg-white/40 backdrop-blur-sm">
-                <h3 className="text-xl font-bold text-gray-900">
-                  Vulnerabilities <span className="text-[#00C8FF]">({vulnerabilities.length})</span>
-                </h3>
+      {/* Vulnerabilities Table */}
+      <div className="card overflow-hidden animate-fade-in-up" style={{ animationDelay: '350ms' }}>
+        {loading ? (
+          <div className="p-12 text-center">
+            <div className="inline-block">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-red-500 to-rose-500 flex items-center justify-center animate-pulse">
+                <i className="fa-solid fa-bug text-white text-xl"></i>
               </div>
-              <div className="overflow-x-auto modern-scrollbar">
-                <table className="min-w-full divide-y divide-gray-200/50">
-                  <thead className="bg-gradient-to-r from-gray-50/80 to-white/60 backdrop-blur-sm">
-                    <tr>
-                      <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                        Title
-                      </th>
-                      <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                        Asset
-                      </th>
-                      <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                        Severity
-                      </th>
-                      <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                        CVSS
-                      </th>
-                      <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                        Status
-                      </th>
-                      <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                        Detected
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white/50 divide-y divide-gray-200/30">
-                    {vulnerabilities.map((vuln, index) => (
+            </div>
+            <p className="mt-4 text-slate-500 dark:text-slate-400">Loading vulnerabilities...</p>
+          </div>
+        ) : filteredVulnerabilities.length > 0 ? (
+          <>
+            <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between bg-slate-50 dark:bg-slate-800/50">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
+                  Vulnerabilities
+                </h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  {filteredVulnerabilities.length} vulnerabilities found
+                </p>
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-slate-50 dark:bg-slate-800/50">
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                      Vulnerability
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                      Asset
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                      Severity
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                      CVSS
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                      Detected
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+                  {filteredVulnerabilities.map((vuln, index) => {
+                    const severityConfig = getSeverityConfig(vuln.severity)
+                    const statusConfig = getStatusConfig(vuln.status)
+                    return (
                       <tr 
                         key={vuln.id} 
-                        className="hover:bg-white/80 transition-all duration-300 cursor-pointer fade-in group"
-                        style={{ animationDelay: `${index * 20}ms` }}
+                        className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer"
+                        onClick={() => setSelectedVuln(vuln)}
+                        style={{ animationDelay: `${400 + index * 30}ms` }}
                       >
                         <td className="px-6 py-4">
-                          <div className="flex items-start space-x-3">
-                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                              vuln.severity === 'critical' ? 'bg-red-100 text-red-600' :
-                              vuln.severity === 'high' ? 'bg-orange-100 text-orange-600' :
-                              vuln.severity === 'medium' ? 'bg-amber-100 text-amber-600' :
-                              'bg-blue-100 text-blue-600'
-                            }`}>
-                              <i className={`fas ${
-                                vuln.severity === 'critical' ? 'fa-exclamation-triangle' :
-                                vuln.severity === 'high' ? 'fa-exclamation-circle' :
-                                'fa-info-circle'
-                              }`}></i>
+                          <div className="flex items-start gap-3">
+                            <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${severityConfig.gradient} flex items-center justify-center flex-shrink-0`}>
+                              <i className={`fa-solid ${severityConfig.icon} text-white text-sm`}></i>
                             </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="text-sm font-bold text-gray-900">{vuln.title}</div>
-                              {vuln.description && (
-                                <div className="text-xs text-gray-500 mt-1 line-clamp-2">{vuln.description}</div>
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium text-slate-900 dark:text-white truncate max-w-xs">
+                                {vuln.title}
+                              </p>
+                              {vuln.cve && (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 mt-1">
+                                  {vuln.cve}
+                                </span>
                               )}
                             </div>
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-semibold text-gray-900">{vuln.asset_name || 'N/A'}</div>
-                          <div className="text-xs text-gray-500">{vuln.asset_type || '-'}</div>
+                        <td className="px-6 py-4">
+                          <p className="text-sm font-medium text-slate-900 dark:text-white">
+                            {vuln.asset_name || 'N/A'}
+                          </p>
+                          <p className="text-xs text-slate-500 dark:text-slate-400 capitalize">
+                            {vuln.asset_type?.replace('_', ' ') || '-'}
+                          </p>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-bold capitalize border ${
-                            vuln.severity === 'critical' ? 'bg-red-50 text-red-700 border-red-200' :
-                            vuln.severity === 'high' ? 'bg-orange-50 text-orange-700 border-orange-200' :
-                            vuln.severity === 'medium' ? 'bg-amber-50 text-amber-700 border-amber-200' :
-                            vuln.severity === 'low' ? 'bg-blue-50 text-blue-700 border-blue-200' :
-                            'bg-gray-50 text-gray-700 border-gray-200'
-                          }`}>
-                            <i className={`fas ${
-                              vuln.severity === 'critical' ? 'fa-exclamation-triangle' :
-                              vuln.severity === 'high' ? 'fa-exclamation-circle' :
-                              'fa-info-circle'
-                            } mr-1.5`}></i>
-                            {vuln.severity}
+                        <td className="px-6 py-4">
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border ${severityConfig.color}`}>
+                            <i className={`fa-solid ${severityConfig.icon}`}></i>
+                            <span className="capitalize">{vuln.severity}</span>
                           </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-6 py-4">
                           {vuln.cvss ? (
-                            <span className="inline-flex items-center px-3 py-1 rounded-lg text-sm font-bold bg-gradient-to-r from-purple-500 to-indigo-500 text-white">
-                              {vuln.cvss}
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold text-sm ${
+                                vuln.cvss >= 9 ? 'bg-red-500' :
+                                vuln.cvss >= 7 ? 'bg-orange-500' :
+                                vuln.cvss >= 4 ? 'bg-amber-500' :
+                                'bg-blue-500'
+                              }`}>
+                                {vuln.cvss}
+                              </div>
+                            </div>
                           ) : (
-                            <span className="text-gray-400">-</span>
+                            <span className="text-slate-400">-</span>
                           )}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-bold capitalize border ${
-                            vuln.status === 'open' ? 'bg-red-50 text-red-700 border-red-200' :
-                            vuln.status === 'in_progress' ? 'bg-blue-50 text-blue-700 border-blue-200' :
-                            vuln.status === 'resolved' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                            'bg-gray-50 text-gray-700 border-gray-200'
-                          }`}>
-                            {vuln.status.replace('_', ' ')}
+                        <td className="px-6 py-4">
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${statusConfig.color}`}>
+                            <i className={`fa-solid ${statusConfig.icon}`}></i>
+                            <span className="capitalize">{vuln.status?.replace('_', ' ')}</span>
                           </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-600">
-                            <div>{new Date(vuln.detected_at).toLocaleDateString()}</div>
-                            <div className="text-xs text-gray-400">{new Date(vuln.detected_at).toLocaleTimeString()}</div>
-                          </div>
+                        <td className="px-6 py-4">
+                          <p className="text-sm text-slate-600 dark:text-slate-300">
+                            {vuln.detected_at ? new Date(vuln.detected_at).toLocaleDateString() : '-'}
+                          </p>
+                          <p className="text-xs text-slate-500 dark:text-slate-400">
+                            {vuln.detected_at ? new Date(vuln.detected_at).toLocaleTimeString() : ''}
+                          </p>
+                        </td>
+                        <td className="px-6 py-4">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setSelectedVuln(vuln)
+                            }}
+                            className="p-2 rounded-lg text-slate-400 hover:text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors"
+                            title="View Details"
+                          >
+                            <i className="fa-solid fa-arrow-right"></i>
+                          </button>
                         </td>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </>
-          ) : (
-            <div className="p-12 text-center">
-              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center mx-auto mb-4 shadow-lg">
-                <i className="fas fa-shield-alt text-gray-400 text-2xl"></i>
-              </div>
-              <h3 className="text-lg font-bold text-gray-900 mb-2">No vulnerabilities found</h3>
-              <p className="text-sm text-gray-600">Vulnerabilities will appear here once detected</p>
+                    )
+                  })}
+                </tbody>
+              </table>
             </div>
-          )}
-        </div>
+          </>
+        ) : (
+          <div className="p-12 text-center">
+            <div className="w-16 h-16 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto mb-4">
+              <i className="fa-solid fa-shield text-2xl text-green-500"></i>
+            </div>
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
+              {searchQuery || filters.severity || filters.status
+                ? 'No vulnerabilities match your filters'
+                : 'No vulnerabilities found'}
+            </h3>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+              {searchQuery || filters.severity || filters.status
+                ? 'Try adjusting your search or filter criteria'
+                : 'Great! Your assets appear to be secure'}
+            </p>
+          </div>
+        )}
       </div>
-    </Layout>
+
+      {/* Vulnerability Detail Modal */}
+      {selectedVuln && (
+        <>
+          <div 
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50"
+            onClick={() => setSelectedVuln(null)}
+          />
+          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl max-h-[90vh] overflow-y-auto z-50 p-4">
+            <div className="card p-6 animate-scale-in">
+              <div className="flex items-start justify-between mb-6">
+                <div className="flex items-start gap-4">
+                  <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${getSeverityConfig(selectedVuln.severity).gradient} flex items-center justify-center`}>
+                    <i className={`fa-solid ${getSeverityConfig(selectedVuln.severity).icon} text-white text-xl`}></i>
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-slate-900 dark:text-white">
+                      {selectedVuln.title}
+                    </h2>
+                    {selectedVuln.cve && (
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 mt-2">
+                        {selectedVuln.cve}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <button
+                  onClick={() => setSelectedVuln(null)}
+                  className="p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                >
+                  <i className="fa-solid fa-xmark"></i>
+                </button>
+              </div>
+
+              <div className="space-y-6">
+                {/* Severity & Status */}
+                <div className="flex items-center gap-4">
+                  <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold border ${getSeverityConfig(selectedVuln.severity).color}`}>
+                    <i className={`fa-solid ${getSeverityConfig(selectedVuln.severity).icon}`}></i>
+                    <span className="capitalize">{selectedVuln.severity}</span>
+                  </span>
+                  <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold ${getStatusConfig(selectedVuln.status).color}`}>
+                    <i className={`fa-solid ${getStatusConfig(selectedVuln.status).icon}`}></i>
+                    <span className="capitalize">{selectedVuln.status?.replace('_', ' ')}</span>
+                  </span>
+                  {selectedVuln.cvss && (
+                    <div className={`px-3 py-1.5 rounded-lg text-sm font-bold text-white ${
+                      selectedVuln.cvss >= 9 ? 'bg-red-500' :
+                      selectedVuln.cvss >= 7 ? 'bg-orange-500' :
+                      selectedVuln.cvss >= 4 ? 'bg-amber-500' :
+                      'bg-blue-500'
+                    }`}>
+                      CVSS: {selectedVuln.cvss}
+                    </div>
+                  )}
+                </div>
+
+                {/* Description */}
+                {selectedVuln.description && (
+                  <div>
+                    <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Description</h3>
+                    <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+                      {selectedVuln.description}
+                    </p>
+                  </div>
+                )}
+
+                {/* Affected Asset */}
+                <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
+                  <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Affected Asset</h3>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center">
+                      <i className="fa-solid fa-server text-primary-600 dark:text-primary-400"></i>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-slate-900 dark:text-white">
+                        {selectedVuln.asset_name || 'N/A'}
+                      </p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 capitalize">
+                        {selectedVuln.asset_type?.replace('_', ' ') || 'Unknown type'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Remediation */}
+                {selectedVuln.remediation && (
+                  <div>
+                    <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Remediation</h3>
+                    <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+                      {selectedVuln.remediation}
+                    </p>
+                  </div>
+                )}
+
+                {/* References */}
+                {selectedVuln.references && selectedVuln.references.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">References</h3>
+                    <ul className="space-y-1">
+                      {selectedVuln.references.map((ref, idx) => (
+                        <li key={idx}>
+                          <a 
+                            href={ref} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-sm text-primary-500 hover:text-primary-600 hover:underline flex items-center gap-1"
+                          >
+                            <i className="fa-solid fa-external-link text-xs"></i>
+                            {ref}
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Timeline */}
+                <div className="flex items-center gap-6 text-sm text-slate-500 dark:text-slate-400">
+                  <div className="flex items-center gap-2">
+                    <i className="fa-solid fa-calendar"></i>
+                    <span>Detected: {selectedVuln.detected_at ? new Date(selectedVuln.detected_at).toLocaleString() : 'N/A'}</span>
+                  </div>
+                  {selectedVuln.resolved_at && (
+                    <div className="flex items-center gap-2">
+                      <i className="fa-solid fa-check"></i>
+                      <span>Resolved: {new Date(selectedVuln.resolved_at).toLocaleString()}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-6 mt-6 border-t border-slate-200 dark:border-slate-700">
+                <button
+                  onClick={() => setSelectedVuln(null)}
+                  className="btn btn-ghost"
+                >
+                  Close
+                </button>
+                <button className="btn btn-primary">
+                  <i className="fa-solid fa-pen"></i>
+                  <span>Update Status</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
   )
 }
 
 export default Vulnerabilities
-
